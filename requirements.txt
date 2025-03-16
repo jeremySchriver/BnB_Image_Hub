@@ -1,0 +1,7 @@
+FastAPI
+SQLAlchemy
+python-multipart
+Pillow
+uvicorn
+alembic
+python-dotenv
