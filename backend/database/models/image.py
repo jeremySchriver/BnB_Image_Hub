@@ -1,8 +1,6 @@
 from sqlalchemy import Column, Integer, String, DateTime, ARRAY
-from sqlalchemy.ext.declarative import declarative_base
+from .base import Base
 from datetime import datetime
-
-Base = declarative_base()
 
 class Image(Base):
     __tablename__ = 'images'
