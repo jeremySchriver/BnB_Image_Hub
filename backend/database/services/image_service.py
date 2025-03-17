@@ -4,6 +4,12 @@ from ..models.image import Image
 from ..schemas.image import ImageCreate
 from typing import List, Optional
 
+def _convert_tags_to_string(tags: List[str]) -> str:
+    return ','.join(tags) if tags else ''
+
+def _convert_string_to_tags(tags_string: str) -> List[str]:
+    return [tag.strip() for tag in tags_string.split(',')] if tags_string else []
+
 def create_image(db: Session, image_data: ImageCreate):
     image = Image(
         filename=image_data.filename,
@@ -11,7 +17,7 @@ def create_image(db: Session, image_data: ImageCreate):
         tagged_thumb_path=image_data.tagged_thumb_path,
         untagged_full_path=image_data.untagged_full_path,
         untagged_thumb_path=image_data.untagged_thumb_path,
-        tags=image_data.tags,
+        tags=_convert_tags_to_string(image_data.tags),
         author=image_data.author
     )
     db.add(image)

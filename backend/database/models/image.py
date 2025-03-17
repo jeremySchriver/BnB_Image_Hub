@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ARRAY
+from sqlalchemy import Column, Integer, String, DateTime
 from .base import Base
 from datetime import datetime
 
@@ -14,10 +14,10 @@ class Image(Base):
     untagged_full_path = Column(String, nullable=True)
     untagged_thumb_path = Column(String, nullable=True)
     
-    # Metadata fields
-    tags = Column(ARRAY(String), nullable=True, default=[])
+    # Store tags as comma-separated string
+    tags = Column(String, nullable=True, default='')
     date_added = Column(DateTime, nullable=False, default=datetime.utcnow)
     author = Column(String, nullable=True)
 
     def __repr__(self):
-        return f"<Image(id={self.id}, filename={self.filename}, path={self.path})>"
+        return f"<Image(id={self.id}, filename={self.filename})>"
