@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import images
+from backend.api.routers import images, users
 
 app = FastAPI()
 
@@ -15,10 +15,11 @@ app.add_middleware(
 
 # Include routers
 app.include_router(images.router)
+app.include_router(users.router)
 
 @app.get("/")
 def read_root():
-    return {"message": "Welcome to the FastAPI Image API"}
+    return {"message": "Welcome to the BnB Image Tagging API"}
 
 if __name__ == "__main__":
     import uvicorn

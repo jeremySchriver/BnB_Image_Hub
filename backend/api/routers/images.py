@@ -1,12 +1,16 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
-from ..database import get_db
-from ..models.image import Image
-from ..schemas.image import ImageCreate, ImageResponse
-from ..services.image_service import save_image, get_image, get_images
 
-router = APIRouter()
+from backend.database.database import get_db
+from backend.database.models.image import Image
+from backend.database.schemas.image import ImageCreate, ImageResponse
+from backend.database.services.image_service import save_image, get_image
+
+router = APIRouter(
+    prefix="/images",
+    tags=["images"]
+)
 
 @router.post("/images/", response_model=ImageResponse)
 async def upload_image(image: UploadFile = File(...), db: Session = next(get_db())):
@@ -21,7 +25,3 @@ async def read_image(image_id: int, db: Session = next(get_db())):
     if image is None:
         raise HTTPException(status_code=404, detail="Image not found")
     return image
-
-@router.get("/images/", response_model=List[ImageResponse])
-async def read_images(skip: int = 0, limit: int = 10, db: Session = next(get_db())):
-    return await get_images(skip=skip, limit=limit)

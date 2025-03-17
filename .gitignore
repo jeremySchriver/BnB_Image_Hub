@@ -20,14 +20,115 @@ file_share/
 /file_share
 E:\Code Projects\Image_Tagger\file_share/
 
-# IDE
-.vscode/
+# IDEs
+# VSCode
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+
+# JetBrains IDEs
 .idea/
+*.iml
+*.ipr
+*.iws
+
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# Vim
 *.swp
 *.swo
+.vim
 
 # Logs
 *.log
 
 # Alembic
 versions/
+
+# Build and Development Files
+# Build outputs
+/build
+/dist
+/dist-ssr
+/.next
+/out
+
+# Development
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+.env*.local
+
+# Package managers
+/node_modules
+/.pnp
+.pnp.js
+yarn.lock
+package-lock.json
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.yarn-integrity
+.npm
+
+# Cache and temporary files
+.cache
+.eslintcache
+.stylelintcache
+tsconfig.tsbuildinfo
+.parcel-cache
+
+# OS Generated Files
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+[Dd]esktop.ini
+
+# Linux
+*~
+.directory
+
+# Testing and Coverage
+# Coverage directories
+/coverage
+/.nyc_output
+/cypress/videos
+/cypress/screenshots
+/cypress/fixtures
+
+# Test results
+/test-results
+/playwright-report
+
+# Miscellaneous
+# Debug logs
+debug.log
+debug.log*
+
+# Production bundles
+*.bundle.js
+*.bundle.js.map
+
+# TypeScript
+*.tsbuildinfo
+
+# Storybook
+storybook-static/
+
+# PWA files
+**/public/precache.*.*.js
+**/public/sw.js
+**/public/workbox-*.js
+**/public/worker-*.js
