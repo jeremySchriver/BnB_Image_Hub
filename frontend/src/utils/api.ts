@@ -129,22 +129,18 @@ export const uploadImages = async (files: File[]): Promise<{ success: boolean, m
 
 // Get untagged images
 export const getUntaggedImages = async (limit: number = 10): Promise<ImageMetadata[]> => {
-  // If in demo mode, return mock images
-  if (isDemoMode()) {
-    return new Promise(resolve => 
-      setTimeout(() => {
-        resolve(MOCK_IMAGES);
-      }, 800)
-    );
-  }
-  
   const response = await fetch(`${BASE_URL}/images/untagged?limit=${limit}`, {
     headers: {
       ...authHeader()
     }
   });
   
-  return handleResponse(response);
+  if (!response.ok) {
+    throw new Error('Failed to fetch untagged images');
+  }
+  
+  const data = await response.json();
+  return data;
 };
 
 // Update image tags
@@ -225,10 +221,5 @@ export const getImageById = async (imageId: string): Promise<ImageMetadata> => {
 
 // Get image URL
 export const getImageUrl = (imageId: string): string => {
-  // If in demo mode, return a placeholder image URL
-  if (isDemoMode()) {
-    return `/placeholder.svg`;
-  }
-  
-  return `${BASE_URL}/images/file/${imageId}`;
+  return `${BASE_URL}/images/${imageId}/content`;
 };

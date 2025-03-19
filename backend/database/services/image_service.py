@@ -73,3 +73,15 @@ def update_image_paths(
         db.commit()
         db.refresh(image)
     return image
+
+def get_untagged_images_fromDB(db: Session, limit: int = 10):
+    """Get images that have no tags but have an untagged path."""
+    return (
+        db.query(Image)
+        .filter(
+            Image.untagged_full_path.isnot(None),
+            (Image.tags == '') | (Image.tags.is_(None))
+        )
+        .limit(limit)
+        .all()
+    )

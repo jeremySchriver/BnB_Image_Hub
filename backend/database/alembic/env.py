@@ -11,14 +11,14 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirna
 from backend.database.models.base import Base
 from backend.database.models.image import Image
 from backend.database.models.user import User
-from backend.database.database import DATABASE_URL
+from backend.database.database import SQLALCHEMY_DATABASE_URL
 
 config = context.config
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-config.set_main_option("sqlalchemy.url", DATABASE_URL)
+config.set_main_option("sqlalchemy.url", SQLALCHEMY_DATABASE_URL)
 target_metadata = Base.metadata
 
 def run_migrations_offline() -> None:

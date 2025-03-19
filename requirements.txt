@@ -7,3 +7,5 @@ alembic
 python-dotenv
 passlib[bcrypt]
 python-jose[cryptography]
+pydantic[email]
+bcrypt
