@@ -85,3 +85,18 @@ def get_untagged_images_fromDB(db: Session, limit: int = 10):
         .limit(limit)
         .all()
     )
+    
+def cast_constant_to_db(db: Session, image_data: ImageCreate) -> Image:
+    db_image = Image(
+        filename=image_data.filename,
+        tagged_full_path=image_data.tagged_full_path,
+        tagged_thumb_path=image_data.tagged_thumb_path,
+        untagged_full_path=image_data.untagged_full_path,
+        untagged_thumb_path=image_data.untagged_thumb_path,
+        tags=_convert_tags_to_string(image_data.tags) if image_data.tags else '',
+        author=image_data.author
+    )
+    db.add(db_image)
+    db.commit()
+    db.refresh(db_image)
+    return db_image
