@@ -1,6 +1,8 @@
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
+from .tag import TagResponse
+from .author import AuthorResponse
 
 class ImageCreate(BaseModel):
     filename: str
@@ -8,8 +10,8 @@ class ImageCreate(BaseModel):
     tagged_thumb_path: Optional[str] = None
     untagged_full_path: Optional[str] = None
     untagged_thumb_path: Optional[str] = None
-    tags: Optional[List[str]] = []
-    author: Optional[str] = None
+    tag_ids: Optional[List[str]] = []
+    author_id: Optional[int] = None
 
 class ImageResponse(BaseModel):
     id: int
@@ -18,16 +20,16 @@ class ImageResponse(BaseModel):
     tagged_thumb_path: Optional[str] = None
     untagged_full_path: Optional[str] = None
     untagged_thumb_path: Optional[str] = None
-    tags: List[str]
+    tags: List[TagResponse]
     date_added: datetime
-    author: Optional[str] = None
+    author: Optional[AuthorResponse] = None
 
     class Config:
         from_attributes = True
         
 class ImageUpdate(BaseModel):
-    tags: List[str]
-    author: Optional[str] = None
+    tag_ids: List[str]
+    author_id: Optional[str] = None
     filename: Optional[str] = None
 
     class Config:

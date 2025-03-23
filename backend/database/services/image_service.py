@@ -178,13 +178,27 @@ def get_image(db: Session, image_id: int):
 def list_images(db: Session, skip: int = 0, limit: int = 100):
     return db.query(Image).offset(skip).limit(limit).all()
 
-def get_all_untagged_images(db: Session):
-    """Get all images that have no tags but have an untagged path."""
-    return db.query(Image).filter((Image.untagged_full_path != False) and (Image.tags == "")).all()
-
 def get_next_untagged_image(db: Session):
-    """Get all images that have no tags but have an untagged path."""
-    return db.query(Image).filter((Image.untagged_full_path != False) and (Image.tags == "")).first()
+    """Get the next untagged image that hasn't been processed yet."""
+    return (
+        db.query(Image)
+        .filter(
+            Image.untagged_full_path.isnot(None),  # Has an untagged path
+            ~Image.tags.any()  # No tags assigned yet (using any() with ~ for "not any")
+        )
+        .first()
+    )
+
+def get_all_untagged_images(db: Session):
+    """Get all images that haven't been tagged yet."""
+    return (
+        db.query(Image)
+        .filter(
+            Image.untagged_full_path.isnot(None),  # Has an untagged path
+            ~Image.tags.any()  # No tags assigned yet (using any() with ~ for "not any")
+        )
+        .all()
+    )
 
 def get_images_by_tags(db: Session, tags: List[str], skip: int = 0, limit: int = 100):
     """Get images that contain all specified tags."""
@@ -217,8 +231,7 @@ def cast_constant_to_db(db: Session, image_data: ImageCreate) -> Image:
         tagged_thumb_path=image_data.tagged_thumb_path,
         untagged_full_path=image_data.untagged_full_path,
         untagged_thumb_path=image_data.untagged_thumb_path,
-        tags=_convert_tags_to_string(image_data.tags) if image_data.tags else '',
-        author=image_data.author
+        author_id=image_data.author_id
     )
     db.add(db_image)
     db.commit()

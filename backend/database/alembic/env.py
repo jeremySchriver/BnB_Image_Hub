@@ -11,6 +11,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirna
 from backend.database.models.base import Base
 from backend.database.models.image import Image
 from backend.database.models.user import User
+from backend.database.models.tag import Tag
+from backend.database.models.author import Author
+from backend.database.models.relationships import image_tags
 from backend.database.database import SQLALCHEMY_DATABASE_URL
 
 config = context.config

@@ -93,9 +93,9 @@ def get_untagged_list(db: Session = Depends(get_db)):
                 "tagged_thumb_path": None,
                 "untagged_full_path": image.untagged_full_path,
                 "untagged_thumb_path": image.untagged_thumb_path,
-                "tags": image.tags,
+                "tags": [tag.name for tag in image.tags],
                 "date_added": image.date_added.isoformat() if image.date_added else None,
-                "author": image.author
+                "author": image.author.name if image.author else None
             }
             response.append(image_data)
             
@@ -109,25 +109,25 @@ def get_untagged_list(db: Session = Depends(get_db)):
         
 @router.get("/untagged/next")
 def get_untagged_list(db: Session = Depends(get_db)):
-    """Get all untagged images from the database."""
+    """Get the next untagged image from the database."""
     try:
-        # Query untagged images directly from database
         image = get_next_untagged_image(db)
         
+        if not image:
+            return []
+
         # Format response
-        response = []
-        image_data = {
+        response = [{
             "id": str(image.id),
             "filename": image.filename,
-            "tagged_full_path": None,
-            "tagged_thumb_path": None,
+            "tagged_full_path": image.tagged_full_path,
+            "tagged_thumb_path": image.tagged_thumb_path,
             "untagged_full_path": image.untagged_full_path,
             "untagged_thumb_path": image.untagged_thumb_path,
-            "tags": image.tags,
+            "tags": [tag.name for tag in image.tags],  # Convert tag objects to names
             "date_added": image.date_added.isoformat() if image.date_added else None,
-            "author": image.author
-        }
-        response.append(image_data)
+            "author": image.author.name if image.author else None  # Get author name if exists
+        }]
             
         return response
 

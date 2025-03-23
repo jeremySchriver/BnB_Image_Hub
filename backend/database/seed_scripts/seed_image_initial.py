@@ -9,19 +9,47 @@ project_root = Path(__file__).parent.parent.parent.parent
 sys.path.append(str(project_root))
 
 from backend.database.database import get_db
-from backend.database.models.image import Image
+from backend.database.models import Image, Author, Tag
 from backend.database.schemas.image import ImageCreate
 from backend.database.services.image_service import cast_constant_to_db, list_images
 
 # Initial data using UserCreate instead of UserBase
 image_data = [
-    ImageCreate(filename="modern-anonymous-concept-with-flat-design_23-2147876483", untagged_full_path="E:\\Code_Projects\\Image_Tagger\\file_share\\un-tagged\\modern-anonymous-concept-with-flat-design_23-2147876483.jpg"),
-    ImageCreate(filename="Smiley", untagged_full_path="E:\\Code_Projects\\Image_Tagger\\file_share\\un-tagged\\Smiley.png"),
-    ImageCreate(filename="ve-fara-glass-lg", untagged_full_path="E:\\Code_Projects\\Image_Tagger\\file_share\\un-tagged\\ve-fara-glass-lg.webp"),
-    ImageCreate(filename="IMG_1851", untagged_full_path="E:\\Code_Projects\\Image_Tagger\\file_share\\un-tagged\\IMG_1851.png"),
-    ImageCreate(filename="IMG_2389", untagged_full_path="E:\\Code_Projects\\Image_Tagger\\file_share\\un-tagged\\IMG_2389.png"),
-    ImageCreate(filename="IMG_8576 (1)", untagged_full_path="E:\\Code_Projects\\Image_Tagger\\file_share\\un-tagged\\IMG_8576 (1).jpg"),
-    ImageCreate(filename="Rainbow on rainbow Pokémon patches", untagged_full_path="E:\\Code_Projects\\Image_Tagger\\file_share\\un-tagged\\Rainbow on rainbow Pokémon patches.png")
+    ImageCreate(
+        filename="modern-anonymous-concept-with-flat-design_23-2147876483", untagged_full_path="E:\\Code_Projects\\Image_Tagger\\file_share\\un-tagged\\modern-anonymous-concept-with-flat-design_23-2147876483.jpg",
+        tag_ids=[],
+        author_id=None 
+        ),
+    ImageCreate(
+        filename="Smiley", untagged_full_path="E:\\Code_Projects\\Image_Tagger\\file_share\\un-tagged\\Smiley.png",
+        tag_ids=[],
+        author_id=None 
+        ),
+    ImageCreate(
+        filename="ve-fara-glass-lg", untagged_full_path="E:\\Code_Projects\\Image_Tagger\\file_share\\un-tagged\\ve-fara-glass-lg.webp",
+        tag_ids=[],
+        author_id=None 
+        ),
+    ImageCreate(
+        filename="IMG_1851", untagged_full_path="E:\\Code_Projects\\Image_Tagger\\file_share\\un-tagged\\IMG_1851.png",
+        tag_ids=[],
+        author_id=None 
+        ),
+    ImageCreate(
+        filename="IMG_2389", untagged_full_path="E:\\Code_Projects\\Image_Tagger\\file_share\\un-tagged\\IMG_2389.png",
+        tag_ids=[],
+        author_id=None 
+        ),
+    ImageCreate(
+        filename="IMG_8576 (1)", untagged_full_path="E:\\Code_Projects\\Image_Tagger\\file_share\\un-tagged\\IMG_8576 (1).jpg",
+        tag_ids=[],
+        author_id=None 
+        ),
+    ImageCreate(
+        filename="Rainbow on rainbow Pokémon patches", untagged_full_path="E:\\Code_Projects\\Image_Tagger\\file_share\\un-tagged\\Rainbow on rainbow Pokémon patches.png",
+        tag_ids=[],
+        author_id=None 
+        ),
 ]
 
 def seed_image_constants(db: Session, image_data: list[ImageCreate]):
@@ -35,7 +63,6 @@ def seed_image_constants(db: Session, image_data: list[ImageCreate]):
             print(f"Image with filename {image.filename} already exists.")
             continue
         
-#Add something to wipe the image table before seeding
 def purge_image_table(db: Session):
     """Wipe the image table before seeding."""
     # Uncomment the following lines to wipe the table
@@ -59,9 +86,12 @@ def move_files_to_untagged_folder():
         if os.path.isfile(source_path):
             shutil.copy(source_path, target_path)
             print(f'Moved: {source_path} -> {target_path}')
-
-if __name__ == "__main__":
+            
+def main():
     db = next(get_db()) 
     purge_image_table(db)
     move_files_to_untagged_folder()
     seed_image_constants(db, image_data)
+
+if __name__ == "__main__":
+    main()

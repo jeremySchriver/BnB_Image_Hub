@@ -9,7 +9,7 @@ project_root = Path(__file__).parent.parent.parent.parent
 sys.path.append(str(project_root))
 
 from backend.database.database import get_db
-from backend.database.models.image import Image
+from backend.database.models import Image, Author, Tag
 from backend.database.models.user import User
 from backend.database.services.image_service import _convert_string_to_tags
 
@@ -49,6 +49,12 @@ def main():
     
     # Print Users table
     print_table_data(db, User)
+    
+    # Print Tags table
+    print_table_data(db, Tag)
+    
+    # Print Authors table
+    print_table_data(db, Author)
 
 if __name__ == "__main__":
     main()
