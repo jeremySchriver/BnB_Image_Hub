@@ -12,11 +12,18 @@ export interface LoginResponse {
 export interface ImageMetadata {
   id: string;
   filename: string;
-  file_size: number;
-  file_type: string;
-  upload_date: string;
-  author?: string;
+  tagged_full_path: string;
+  tagged_thumb_path: string;
+  untagged_full_path: string;
+  untagged_thumb_path: string;
   tags: string[];
+  date_added: string;
+  author: string;
+}
+
+export interface UpdateImageTagsData {
+  tags: string[];
+  author?: string;
 }
 
 // Helper for handling HTTP errors
@@ -127,52 +134,6 @@ export const uploadImages = async (files: File[]): Promise<{ success: boolean, m
   return handleResponse(response);
 };
 
-// Get untagged images
-export const getUntaggedImages = async (limit: number = 10): Promise<ImageMetadata[]> => {
-  const response = await fetch(`${BASE_URL}/images/untagged?limit=${limit}`, {
-    headers: {
-      ...authHeader()
-    }
-  });
-  
-  if (!response.ok) {
-    throw new Error('Failed to fetch untagged images');
-  }
-  
-  const data = await response.json();
-  return data;
-};
-
-// Update image tags
-export const updateImageTags = async (
-  imageId: string, 
-  author: string, 
-  tags: string[]
-): Promise<{ success: boolean }> => {
-  // If in demo mode, return a mock success response
-  if (isDemoMode()) {
-    return new Promise(resolve => 
-      setTimeout(() => {
-        resolve({ success: true });
-      }, 800)
-    );
-  }
-  
-  const response = await fetch(`${BASE_URL}/images/${imageId}/tags`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      ...authHeader()
-    },
-    body: JSON.stringify({
-      author,
-      tags
-    })
-  });
-  
-  return handleResponse(response);
-};
-
 // Search images
 export const searchImages = async (query: string): Promise<ImageMetadata[]> => {
   // If in demo mode, return filtered mock images
@@ -222,4 +183,49 @@ export const getImageById = async (imageId: string): Promise<ImageMetadata> => {
 // Get image URL
 export const getImageUrl = (imageId: string): string => {
   return `${BASE_URL}/images/${imageId}/content`;
+};
+
+// Get untagged images
+export const getUntaggedImages = async (limit: number = 10): Promise<ImageMetadata[]> => {
+  const response = await fetch(`/images/untagged?limit=${limit}`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch untagged images');
+  }
+  return response.json();
+};
+
+export const getNextUntaggedImage = async (): Promise<ImageMetadata[]> => {
+  const response = await fetch(`${BASE_URL}/images/untagged/next`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch untagged images');
+  }
+  return response.json();
+};
+
+// Update image tags
+export const updateImageTags = async (
+  imageId: number,
+  updateData: UpdateImageTagsData
+): Promise<ImageMetadata> => {
+  const response = await fetch(`${BASE_URL}/images/tags/${imageId}`, {
+      method: 'PUT',
+      headers: {
+          'Content-Type': 'application/json',
+          ...authHeader()
+      },
+      body: JSON.stringify(updateData)
+  });
+
+  if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Failed to update image tags');
+  }
+
+  return response.json();
+};
+
+// Get image URL
+export const getUntaggedImageUrl = (image: ImageMetadata): string => {
+  // Use the URL provided by the API
+  return `${BASE_URL}${image.untagged_full_path}`;
 };

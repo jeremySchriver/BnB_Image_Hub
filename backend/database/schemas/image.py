@@ -24,3 +24,10 @@ class ImageResponse(BaseModel):
 
     class Config:
         from_attributes = True
+        
+class ImageUpdate(BaseModel):
+    tags: List[str]
+    author: Optional[str] = None
+
+    class Config:
+        from_attributes = True
