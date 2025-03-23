@@ -57,7 +57,8 @@ def update_tags(
             db=db,
             image_id=image_id,
             tags=update_data.tags,
-            author=update_data.author
+            author=update_data.author,
+            filename=update_data.filename
         )
         
         if not updated_image:

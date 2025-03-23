@@ -6,6 +6,11 @@ from ...processor.thumbnail_generator import generate_thumbnail
 from typing import List, Optional
 import os
 import shutil
+import time
+import random
+import string
+from datetime import datetime
+from pathlib import Path
 
 
 '''Tag methods'''
@@ -26,11 +31,35 @@ def _convert_string_to_tags(tags_string: str) -> List[str]:
     # Split by comma, strip whitespace, and filter out empty tags
     return [tag.strip().lower() for tag in tags_string.split(',') if tag.strip()]
 
+'''Filename operations'''
+def _generate_hash_filename(original_filename: str) -> str:
+    """Generate a unique 24-character hash filename while preserving extension."""
+    # Get current timestamp with microseconds
+    current_time = datetime.now()
+    timestamp = current_time.strftime("%Y%m%d%H%M%S")
+    
+    # Create seed from microseconds
+    seed = int(current_time.microsecond)
+    random.seed(seed)
+    
+    # Generate 10 random characters using the time-based seed
+    random_chars = ''.join(random.choices(string.ascii_lowercase + string.digits, k=10))
+    
+    # Reset the random seed to avoid affecting other random operations
+    random.seed()
+    
+    # Get original file extension
+    extension = Path(original_filename).suffix
+    
+    # Combine timestamp and random chars
+    return f"{timestamp}-{random_chars}{extension}"
+
 def update_image_tags(
     db: Session, 
     image_id: int, 
     tags: List[str], 
-    author: Optional[str] = None
+    author: Optional[str] = None,
+    filename: Optional[str] = None
 ) -> Optional[Image]:
     """Update image tags and move the image to tagged storage."""
     try:
@@ -50,23 +79,35 @@ def update_image_tags(
         # Get the untagged path to work with
         untagged_path = image.untagged_full_path
         
-        # 3. Generate new paths by simple string replacement
-        tagged_path = untagged_path.replace('un-tagged', 'tagged')
-        thumbnail_path = untagged_path.replace('un-tagged', 'thumbnails')
+        # Get the original filename to work with
+        original_filename = os.path.basename(untagged_path)
+        
+        # 3. Generate new hashed filename
+        hashed_filename = _generate_hash_filename(original_filename)
+        
+        # 4. Update the filename in the database to match the hashed name
+        image.filename = hashed_filename
+        
+        # 5. Generate new paths with hashed filename       
+        tagged_dir = os.path.join(os.path.dirname(untagged_path).replace('un-tagged', 'tagged'))
+        thumbnail_dir = os.path.join(os.path.dirname(untagged_path).replace('un-tagged', 'thumbnails'))
+        
+        tagged_path = os.path.join(tagged_dir, hashed_filename)
+        thumbnail_path = os.path.join(thumbnail_dir, hashed_filename)
         
         # Ensure directories exist
-        os.makedirs(os.path.dirname(tagged_path), exist_ok=True)
-        os.makedirs(os.path.dirname(thumbnail_path), exist_ok=True)
+        os.makedirs(tagged_dir, exist_ok=True)
+        os.makedirs(thumbnail_dir, exist_ok=True)
         
-        # 4. Generate and save thumbnail
+        # 6. Generate and save thumbnail
         if generate_thumbnail(untagged_path, thumbnail_path):
             image.tagged_thumb_path = thumbnail_path
             
-        # 5. Move original image to tagged folder
+        # 7. Move original image to tagged folder
         shutil.move(untagged_path, tagged_path)
         image.tagged_full_path = tagged_path
         
-        # 6. Clear untagged paths
+        # 8. Clear untagged paths
         image.untagged_full_path = None
         image.untagged_thumb_path = None
         
