@@ -34,6 +34,35 @@ export interface Author {
   date_added: string;
 }
 
+interface SearchFilters {
+  tags?: string[];
+  author?: string;
+}
+
+export const searchImages = async (filters: SearchFilters): Promise<ImageMetadata[]> => {
+  const params = new URLSearchParams();
+  
+  if (filters.tags && filters.tags.length > 0) {
+    params.append('tags', filters.tags.join(','));
+  }
+  
+  if (filters.author) {
+    params.append('author', filters.author);
+  }
+  
+  const response = await fetch(`${BASE_URL}/images/search?${params.toString()}`, {
+    headers: {
+      ...authHeader()
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to search images');
+  }
+  
+  return response.json();
+};
+
 // Helper for handling HTTP errors
 const handleResponse = async (response: Response) => {
   if (!response.ok) {
@@ -106,17 +135,6 @@ export const uploadImages = async (files: File[]): Promise<{ success: boolean, m
       ...authHeader()
     },
     body: formData
-  });
-  
-  return handleResponse(response);
-};
-
-// Search images
-export const searchImages = async (query: string): Promise<ImageMetadata[]> => {
-  const response = await fetch(`${BASE_URL}/images/search?q=${encodeURIComponent(query)}`, {
-    headers: {
-      ...authHeader()
-    }
   });
   
   return handleResponse(response);
