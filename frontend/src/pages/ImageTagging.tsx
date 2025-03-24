@@ -108,7 +108,7 @@ const ImageTagging = () => {
         ) : (
           <div className="space-y-4 mt-[72px]">
             {/* Image preview - reduced height by 100px from calc(100vh-180px) to calc(100vh-280px) */}
-            <div className="rounded-xl border h-[calc(100vh-280px)] flex items-center justify-center bg-secondary/30">
+            <div className="h-[calc(100vh-280px)] flex items-center justify-center bg-secondary/30">
               <img
                 src={getUntaggedPreviewUrl(currentImage.id)}
                 alt={currentImage.filename}
