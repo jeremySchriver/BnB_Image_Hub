@@ -27,6 +27,13 @@ export interface UpdateImageTagsData {
   filename?: string;
 }
 
+export interface Author {
+  id: number;
+  name: string;
+  email: string;
+  date_added: string;
+}
+
 // Helper for handling HTTP errors
 const handleResponse = async (response: Response) => {
   if (!response.ok) {
@@ -76,37 +83,6 @@ export const isDemoMode = (): boolean => {
   return getToken() === 'demo_token_for_preview_only';
 };
 
-// Mock data for demo mode
-const MOCK_IMAGES = [
-  {
-    id: 'img1',
-    filename: 'mountain.jpg',
-    file_size: 1024000,
-    file_type: 'image/jpeg',
-    upload_date: new Date().toISOString(),
-    author: '',
-    tags: []
-  },
-  {
-    id: 'img2',
-    filename: 'beach.jpg',
-    file_size: 2048000,
-    file_type: 'image/jpeg',
-    upload_date: new Date().toISOString(),
-    author: '',
-    tags: []
-  },
-  {
-    id: 'img3',
-    filename: 'forest.png',
-    file_size: 3072000,
-    file_type: 'image/png',
-    upload_date: new Date().toISOString(),
-    author: '',
-    tags: []
-  }
-];
-
 // Image upload functions
 export const uploadImages = async (files: File[]): Promise<{ success: boolean, message: string, failed?: string[] }> => {
   // If in demo mode, return a mock success response
@@ -137,42 +113,7 @@ export const uploadImages = async (files: File[]): Promise<{ success: boolean, m
 
 // Search images
 export const searchImages = async (query: string): Promise<ImageMetadata[]> => {
-  // If in demo mode, return filtered mock images
-  if (isDemoMode()) {
-    return new Promise(resolve => 
-      setTimeout(() => {
-        // Simple mock filtering based on filename
-        const filtered = MOCK_IMAGES.filter(img => 
-          img.filename.toLowerCase().includes(query.toLowerCase()) ||
-          (img.tags && img.tags.some(tag => tag.toLowerCase().includes(query.toLowerCase())))
-        );
-        resolve(filtered.length > 0 ? filtered : MOCK_IMAGES);
-      }, 800)
-    );
-  }
-  
   const response = await fetch(`${BASE_URL}/images/search?q=${encodeURIComponent(query)}`, {
-    headers: {
-      ...authHeader()
-    }
-  });
-  
-  return handleResponse(response);
-};
-
-// Get image by ID
-export const getImageById = async (imageId: string): Promise<ImageMetadata> => {
-  // If in demo mode, return a mock image
-  if (isDemoMode()) {
-    return new Promise(resolve => 
-      setTimeout(() => {
-        const mockImage = MOCK_IMAGES.find(img => img.id === imageId) || MOCK_IMAGES[0];
-        resolve(mockImage);
-      }, 800)
-    );
-  }
-  
-  const response = await fetch(`${BASE_URL}/images/${imageId}`, {
     headers: {
       ...authHeader()
     }
@@ -246,4 +187,8 @@ export const searchAuthors = async (query: string): Promise<Author[]> => {
     throw new Error('Failed to fetch author suggestions');
   }
   return response.json();
+};
+
+export const getUntaggedPreviewUrl = (imageId: string, maxSize: number = 800): string => {
+  return `${BASE_URL}/preview/untagged/preview/${imageId}?max_size=${maxSize}`;
 };

@@ -8,6 +8,7 @@ import TagInput from '@/components/TagInput';
 import { updateImageTags, getNextUntaggedImage } from '@/utils/api';
 import type { ImageMetadata } from '@/utils/api';
 import AuthorInput from '@/components/AuthorInput';
+import { getUntaggedPreviewUrl } from '@/utils/api';
 
 
 const ImageTagging = () => {
@@ -96,27 +97,32 @@ const ImageTagging = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <TransitionWrapper className="container max-w-4xl py-6 mt-16">
+      <TransitionWrapper className="max-w-screen-2xl mx-auto">
         {loading ? (
-          <div className="text-center py-12">Loading image...</div>
+          <div className="text-center py-12 mt-[72px]">Loading image...</div>
         ) : !currentImage ? (
-          <div className="text-center py-12">
-            <h3>No untagged images found</h3>
+          <div className="text-center py-12 mt-[72px]">
+            <h3 className="text-xl font-semibold mb-4">No untagged images found</h3>
             <Button onClick={fetchNextImage}>Refresh</Button>
           </div>
         ) : (
-          <div className="space-y-8">
-            {/* Image preview */}
-            <div className="rounded-xl border">
+          <div className="space-y-4 mt-[72px]">
+            {/* Image preview - reduced height by 100px from calc(100vh-180px) to calc(100vh-280px) */}
+            <div className="rounded-xl border h-[calc(100vh-280px)] flex items-center justify-center bg-secondary/30">
               <img
-                src={`http://localhost:8000/images/content/${currentImage.id}`}
+                src={getUntaggedPreviewUrl(currentImage.id)}
                 alt={currentImage.filename}
-                className="w-full h-full object-contain"
+                className="max-h-full max-w-full object-contain rounded-lg"
+                loading="lazy"
+                onError={(e) => {
+                  console.error('Error loading image:', e);
+                  toast.error('Failed to load image preview');
+                }}
               />
             </div>
 
-            {/* Tagging form */}
-            <div className="space-y-4">
+            {/* Form section */}
+            <div className="space-y-4 px-4 pb-4 max-w-4xl mx-auto">
               <AuthorInput
                 value={author}
                 onChange={setAuthor}
@@ -131,12 +137,8 @@ const ImageTagging = () => {
               />
 
               <div className="flex justify-between">
-                <Button onClick={fetchNextImage}>
-                  Skip
-                </Button>
-                <Button onClick={handleSave} disabled={saving}>
-                  Save Tags
-                </Button>
+                <Button onClick={fetchNextImage}>Skip</Button>
+                <Button onClick={handleSave} disabled={saving}>Save Tags</Button>
               </div>
             </div>
           </div>
