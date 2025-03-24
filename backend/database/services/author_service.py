@@ -20,6 +20,9 @@ def get_author_by_id(db: Session, author_id: int):
 def get_author_by_email(db: Session, author_id: int):
     return db.query(Author).filter(Author.id == author_id).first()
 
+def get_author_by_name(db: Session, name: str):
+    return db.query(Author).filter(Author.name == name).first()
+
 def get_author_list(db: Session, skip: int = 0, limit: int = 1000):
     return db.query(Author).offset(skip).limit(limit).all()
 
@@ -41,3 +44,11 @@ def cast_constant_to_db(db: Session, author_data: AuthorCreate) -> Author:
     db.commit()
     db.refresh(db_author)
     return db_author
+
+'''Type ahead text methods'''
+def search_authors(db: Session, query: str, limit: int = 10):
+    """Search authors by partial name match"""
+    return db.query(Author)\
+        .filter(Author.name.ilike(f"%{query}%"))\
+        .limit(limit)\
+        .all()

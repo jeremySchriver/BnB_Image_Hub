@@ -2,7 +2,12 @@ from sqlalchemy.orm import Session
 from fastapi import UploadFile, File
 from ..models.image import Image
 from ..schemas.image import ImageCreate
+from ..models.tag import Tag
+from ..schemas.tag import TagCreate
 from ...processor.thumbnail_generator import generate_thumbnail
+from .tag_service import create_tag, get_tag_by_partial_name
+from ..services.author_service import get_author_by_name, create_author
+from ..schemas.author import AuthorCreate
 from typing import List, Optional
 import os
 import shutil
@@ -68,62 +73,85 @@ def update_image_tags(
         if not image:
             return None
 
-        # 1. Update tags
-        tags_string = _convert_tags_to_string(tags)
-        image.tags = tags_string
+        # 1. Process tags
+        image.tags = []  # Clear existing tags
+        for tag_name in tags:
+            tag_name = tag_name.strip().lower()
+            # Try to find existing tag
+            existing_tag = get_tag_by_partial_name(db, tag_name, limit=1)
+            if existing_tag and existing_tag[0].name == tag_name:
+                tag = existing_tag[0]
+            else:
+                # Create new tag if it doesn't exist
+                tag = create_tag(db, TagCreate(name=tag_name))
+            
+            # Add tag to image's tags collection
+            image.tags.append(tag)
         
         # 2. Update author if provided
         if author is not None:
-            image.author = author.strip()
-        
-        # Get the untagged path to work with
-        untagged_path = image.untagged_full_path
-        
-        # Get the original filename to work with
-        original_filename = os.path.basename(untagged_path)
-        
-        # 3. Generate new hashed filename
-        hashed_filename = _generate_hash_filename(original_filename)
-        
-        # 4. Update the filename in the database to match the hashed name
-        image.filename = hashed_filename
-        
-        # 5. Generate new paths with hashed filename       
-        tagged_dir = os.path.join(os.path.dirname(untagged_path).replace('un-tagged', 'tagged'))
-        thumbnail_dir = os.path.join(os.path.dirname(untagged_path).replace('un-tagged', 'thumbnails'))
-        
-        tagged_path = os.path.join(tagged_dir, hashed_filename)
-        thumbnail_path = os.path.join(thumbnail_dir, hashed_filename)
-        
-        # Ensure directories exist
-        os.makedirs(tagged_dir, exist_ok=True)
-        os.makedirs(thumbnail_dir, exist_ok=True)
-        
-        # 6. Generate and save thumbnail
-        if generate_thumbnail(untagged_path, thumbnail_path):
-            image.tagged_thumb_path = thumbnail_path
-            
-        # 7. Move original image to tagged folder
-        shutil.move(untagged_path, tagged_path)
-        image.tagged_full_path = tagged_path
-        
-        # 8. Clear untagged paths
-        image.untagged_full_path = None
-        image.untagged_thumb_path = None
-        
-        # Commit changes
+            # Try to find existing author
+            existing_author = get_author_by_name(db, author.strip())
+            if existing_author:
+                image.author_id = existing_author.id
+            else:
+                # Create new author if doesn't exist
+                new_author = create_author(db, AuthorCreate(
+                    name=author.strip(),
+                    email=f"{author.strip().replace(' ', '_')}@placeholder.com"
+                ))
+                image.author_id = new_author.id
+
+        # Early commit to save tag and author changes
         db.commit()
-        db.refresh(image)
-        
+
+        # 3. Handle file operations only if untagged path exists
+        if image.untagged_full_path and os.path.exists(image.untagged_full_path):
+            try:
+                # Generate new hashed filename
+                original_filename = os.path.basename(image.untagged_full_path)
+                hashed_filename = _generate_hash_filename(original_filename)
+                image.filename = hashed_filename
+
+                # Set up paths
+                base_dir = os.path.dirname(os.path.dirname(image.untagged_full_path))
+                tagged_dir = os.path.join(base_dir, 'tagged')
+                thumbnail_dir = os.path.join(base_dir, 'thumbnails')
+                
+                # Ensure directories exist
+                os.makedirs(tagged_dir, exist_ok=True)
+                os.makedirs(thumbnail_dir, exist_ok=True)
+
+                # Set up new file paths
+                tagged_path = os.path.join(tagged_dir, hashed_filename)
+                thumbnail_path = os.path.join(thumbnail_dir, hashed_filename)
+
+                # Generate and save thumbnail
+                if generate_thumbnail(image.untagged_full_path, thumbnail_path):
+                    image.tagged_thumb_path = thumbnail_path
+
+                # Move original image to tagged folder
+                shutil.move(image.untagged_full_path, tagged_path)
+                image.tagged_full_path = tagged_path
+                
+                # Clear untagged paths
+                image.untagged_full_path = None
+                image.untagged_thumb_path = None
+
+                # Commit file changes
+                db.commit()
+                db.refresh(image)
+
+            except Exception as file_error:
+                print(f"File operation error: {str(file_error)}")
+                # Don't raise the error - we've already saved the tags and author
+                # Just log it and continue
+
         return image
-        
+
     except Exception as e:
         db.rollback()
-        # Clean up any partially created files if there was an error
-        if 'thumbnail_path' in locals() and os.path.exists(thumbnail_path):
-            os.remove(thumbnail_path)
-        if 'tagged_path' in locals() and os.path.exists(tagged_path):
-            os.remove(tagged_path)
+        print(f"Database operation error: {str(e)}")
         raise e
 
 '''File path update methods'''

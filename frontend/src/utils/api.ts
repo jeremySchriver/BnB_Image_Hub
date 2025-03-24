@@ -24,6 +24,7 @@ export interface ImageMetadata {
 export interface UpdateImageTagsData {
   tags: string[];
   author?: string;
+  filename?: string;
 }
 
 // Helper for handling HTTP errors
@@ -228,4 +229,21 @@ export const updateImageTags = async (
 export const getUntaggedImageUrl = (image: ImageMetadata): string => {
   // Use the URL provided by the API
   return `${BASE_URL}${image.untagged_full_path}`;
+};
+
+export const searchTags = async (query: string): Promise<string[]> => {
+  const response = await fetch(`${BASE_URL}/tags/search?query=${encodeURIComponent(query)}`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch tag suggestions');
+  }
+  const tags = await response.json();
+  return tags.map((tag: { name: string }) => tag.name);
+};
+
+export const searchAuthors = async (query: string): Promise<Author[]> => {
+  const response = await fetch(`${BASE_URL}/authors/search?query=${encodeURIComponent(query)}`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch author suggestions');
+  }
+  return response.json();
 };

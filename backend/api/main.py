@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from backend.api.routers import images, users
+from backend.api.routers import images, users, tags, authors
 
 app = FastAPI()
 
@@ -16,6 +16,8 @@ app.add_middleware(
 # Include routers
 app.include_router(images.router)
 app.include_router(users.router)
+app.include_router(tags.router)
+app.include_router(authors.router)
 
 @app.get("/")
 def read_root():

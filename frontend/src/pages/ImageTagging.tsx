@@ -7,6 +7,8 @@ import Navbar from '@/components/Navbar';
 import TagInput from '@/components/TagInput';
 import { updateImageTags, getNextUntaggedImage } from '@/utils/api';
 import type { ImageMetadata } from '@/utils/api';
+import AuthorInput from '@/components/AuthorInput';
+
 
 const ImageTagging = () => {
   const [currentImage, setCurrentImage] = useState<ImageMetadata | null>(null);
@@ -115,12 +117,11 @@ const ImageTagging = () => {
 
             {/* Tagging form */}
             <div className="space-y-4">
-              <input
-                type="text"
+              <AuthorInput
                 value={author}
-                onChange={(e) => setAuthor(e.target.value)}
-                placeholder="Author name"
-                className="w-full p-2 border rounded"
+                onChange={setAuthor}
+                placeholder="Enter author name..."
+                className="w-full"
               />
               
               <TagInput

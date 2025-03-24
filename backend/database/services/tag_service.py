@@ -20,6 +20,13 @@ def get_tag_name(db: Session, tag_id: int):
 def get_tag_list(db: Session, skip: int = 0, limit: int = 1000):
     return db.query(Tag).offset(skip).limit(limit).all()
 
+def get_tag_by_partial_name(db: Session, query: str, limit: int = 10):
+    """Search tags by partial name match"""
+    return db.query(Tag)\
+        .filter(Tag.name.ilike(f"%{query}%"))\
+        .limit(limit)\
+        .all()
+
 '''Deletion methods'''
 def delete_tag_id(db: Session, tag_id: int):
     tag = db.query(Tag).filter(Tag.id == tag_id).first()

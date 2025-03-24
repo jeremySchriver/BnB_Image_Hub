@@ -28,8 +28,8 @@ class ImageResponse(BaseModel):
         from_attributes = True
         
 class ImageUpdate(BaseModel):
-    tag_ids: List[str]
-    author_id: Optional[str] = None
+    tags: List[str]  # Change from tag_ids to tags
+    author: Optional[str] = None  # Change from author_id to author
     filename: Optional[str] = None
 
     class Config:

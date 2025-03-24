@@ -70,6 +70,7 @@ def update_tags(
         return updated_image
         
     except Exception as e:
+        print(f"Error in update_tags endpoint: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Failed to process image: {str(e)}"
