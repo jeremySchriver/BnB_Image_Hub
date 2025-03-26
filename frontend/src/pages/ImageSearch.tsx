@@ -13,7 +13,7 @@ import {
   getPreviewUrl, 
   getActualImage, 
   updateImageMetadata, 
-  getImageById 
+  updateImageTags 
 } from '@/utils/api';
 import type { ImageMetadata } from '@/utils/api';
 
@@ -124,13 +124,19 @@ const ImageSearch = () => {
     
     try {
       const imageId = parseInt(selectedImage.id);
-      // First update the metadata
-      await updateImageMetadata(imageId, {
+      const updateData = {
         tags: editTags,
         author: editAuthor
-      });
+      };
   
-      // Then fetch fresh image data
+      // If image is untagged (has untagged_full_path), use updateImageTags
+      if (selectedImage.untagged_full_path) {
+        await updateImageTags(imageId, updateData);
+      } else {
+        await updateImageMetadata(imageId, updateData);
+      }
+  
+      // Refresh search results with current filters
       const filters = {
         tags: filterTags,
         author: filterAuthor
@@ -138,7 +144,7 @@ const ImageSearch = () => {
       const updatedImages = await searchImages(filters);
       setImages(updatedImages);
       
-      // Update the selected image with the fresh data
+      // Update selected image with fresh data
       const updatedSelectedImage = updatedImages.find(img => img.id === selectedImage.id);
       if (updatedSelectedImage) {
         setSelectedImage(updatedSelectedImage);
@@ -147,7 +153,7 @@ const ImageSearch = () => {
       setIsEditing(false);
       toast.success('Changes saved successfully');
     } catch (error) {
-      console.error('Failed to update metadata:', error);
+      console.error('Failed to update image:', error);
       toast.error('Failed to save changes');
     }
   };
