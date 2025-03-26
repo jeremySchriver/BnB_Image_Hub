@@ -218,3 +218,32 @@ export const getPreviewUrl = (imageId: string, size: 'preview' | 'search'): stri
 export const getActualImage = (imageId: string): string => {
   return `${BASE_URL}/images/content/${imageId}`;
 };
+
+export const getImageById = async (imageId: number): Promise<ImageMetadata> => {
+  const response = await fetch(`${BASE_URL}/images/search/${imageId}`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch image');
+  }
+  return response.json();
+};
+
+export const updateImageMetadata = async (
+  imageId: number,
+  updateData: UpdateImageTagsData
+): Promise<ImageMetadata> => {
+  const response = await fetch(`${BASE_URL}/images/metadata/${imageId}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeader()
+    },
+    body: JSON.stringify(updateData)
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.detail || 'Failed to update image metadata');
+  }
+
+  return response.json();
+};

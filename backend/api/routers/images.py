@@ -8,9 +8,10 @@ import logging
 from backend.database.database import get_db
 from backend.database.models.image import Image
 from backend.database.schemas.image import ImageResponse, ImageUpdate
+from backend.database.schemas.tag import TagResponse
 from backend.database.models.tag import Tag
 from backend.database.models.author import Author
-from backend.database.services.image_service import get_image, get_all_untagged_images, get_next_untagged_image, update_image_tags
+from backend.database.services.image_service import get_image, get_all_untagged_images, get_next_untagged_image, update_image_tags, update_image_metadata
 from backend.config import TAG_PREVIEW_DIR, SEARCH_PREVIEW_DIR
 
 logger = logging.getLogger(__name__)
@@ -192,22 +193,32 @@ def get_image_by_id(
         if not image:
             raise HTTPException(status_code=404, detail="Image not found")
         
-        # Format response
-        image_data = {
-            "id": str(image.id),
-            "filename": image.filename,
-            "tagged_full_path": image.tagged_full_path,
-            "tagged_thumb_path": image.tagged_thumb_path,
-            "untagged_full_path": image.untagged_full_path,
-            "untagged_thumb_path": image.untagged_thumb_path,
-            "tags": [tag.name for tag in image.tags],
-            "date_added": image.date_added.isoformat() if image.date_added else None,
-            "author": image.author.name if image.author else None
-        }
+        # Convert tags to TagResponse objects
+        tag_responses = [
+            TagResponse(
+                id=tag.id,
+                name=tag.name,
+                date_added=tag.date_added
+            ) for tag in image.tags
+        ]
         
-        return image_data
+        # Format response
+        response = ImageResponse(
+            id=image.id,  # Note: Changed from str(image.id) to image.id as per model
+            filename=image.filename,
+            tagged_full_path=image.tagged_full_path,
+            search_preview_path=image.search_preview_path,
+            tag_preview_path=image.tag_preview_path,
+            untagged_full_path=image.untagged_full_path,
+            tags=tag_responses,
+            date_added=image.date_added,
+            author=image.author
+        )
+        
+        return response
 
     except Exception as e:
+        logger.error(f"Error in get_image_by_id: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Failed to get image by ID: {str(e)}"
@@ -320,4 +331,33 @@ async def get_preview(
         raise HTTPException(
             status_code=500,
             detail=f"Error retrieving preview: {str(e)}"
+        )
+        
+@router.put("/metadata/{image_id}")
+def update_metadata(
+    image_id: int,
+    update_data: ImageUpdate,
+    db: Session = Depends(get_db)
+):
+    """Update image metadata only (tags and author) without file operations."""
+    try:
+        updated_image = update_image_metadata(
+            db=db,
+            image_id=image_id,
+            tags=update_data.tags,
+            author=update_data.author
+        )
+        
+        if not updated_image:
+            raise HTTPException(
+                status_code=404,
+                detail="Image not found"
+            )
+            
+        return updated_image
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to update image metadata: {str(e)}"
         )
