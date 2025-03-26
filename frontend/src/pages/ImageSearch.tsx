@@ -8,7 +8,7 @@ import ImageCard from '@/components/ImageCard';
 import TagInput from '@/components/TagInput';
 import AuthorInput from '@/components/AuthorInput';
 import { cn } from '@/lib/utils';
-import { searchImages, getUntaggedPreviewUrl } from '@/utils/api';
+import { searchImages, getPreviewUrl } from '@/utils/api';
 import type { ImageMetadata } from '@/utils/api';
 
 const ImageSearch = () => {
@@ -148,7 +148,7 @@ const ImageSearch = () => {
               {images.map((image) => (
                 <ImageCard
                   key={image.id}
-                  src={getUntaggedPreviewUrl(image.id)}
+                  src={getPreviewUrl(image.id, 'search')}
                   alt={`Image ${image.id}`}
                   tags={image.tags}
                   author={image.author}
@@ -187,7 +187,7 @@ const ImageSearch = () => {
               <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
                 <div className="md:w-2/3 p-4 flex items-center justify-center bg-secondary/30">
                   <img
-                    src={getUntaggedPreviewUrl(selectedImage.id)}
+                    src={getPreviewUrl(selectedImage.id, 'preview')}
                     alt={`Image ${selectedImage.id}`}
                     className="max-h-[60vh] max-w-full object-contain"
                   />

@@ -3,6 +3,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import os
+import logging
 
 from backend.database.database import get_db
 from backend.database.models.image import Image
@@ -10,7 +11,9 @@ from backend.database.schemas.image import ImageResponse, ImageUpdate
 from backend.database.models.tag import Tag
 from backend.database.models.author import Author
 from backend.database.services.image_service import get_image, get_all_untagged_images, get_next_untagged_image, update_image_tags
+from backend.config import TAG_PREVIEW_DIR, SEARCH_PREVIEW_DIR
 
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/images",
@@ -124,9 +127,9 @@ def get_untagged_list(db: Session = Depends(get_db)):
             "id": str(image.id),
             "filename": image.filename,
             "tagged_full_path": image.tagged_full_path,
-            "tagged_thumb_path": image.tagged_thumb_path,
+            "search_preview_path": image.search_preview_path,
+            "tag_preview_path": image.tag_preview_path,
             "untagged_full_path": image.untagged_full_path,
-            "untagged_thumb_path": image.untagged_thumb_path,
             "tags": [tag.name for tag in image.tags],  # Convert tag objects to names
             "date_added": image.date_added.isoformat() if image.date_added else None,
             "author": image.author.name if image.author else None  # Get author name if exists
@@ -249,11 +252,12 @@ def search_images(
 ):
     """Search images with optional tag and author filters."""
     try:
+        # Start with base query
         query = db.query(Image)
 
         # Apply filters if provided
         if tags:
-            tag_list = [tag.strip() for tag in tags.split(',') if tag.strip()]
+            tag_list = [tag.strip().lower() for tag in tags.split(',') if tag.strip()]
             if tag_list:
                 # Join with tags table and filter for images that have ALL specified tags
                 for tag in tag_list:
@@ -261,30 +265,59 @@ def search_images(
 
         if author:
             # Join with author table and filter by author name
-            query = query.join(Image.author).filter(Author.name == author)
+            query = query.join(Image.author).filter(Author.name == author.strip())
 
-        images = query.all()
+        # Execute query and get results
+        images = query.distinct().all()
         
         # Format response
         response = []
         for image in images:
-            image_data = {
+            response.append({
                 "id": str(image.id),
                 "filename": image.filename,
                 "tagged_full_path": image.tagged_full_path,
-                "tagged_thumb_path": image.tagged_thumb_path,
                 "untagged_full_path": image.untagged_full_path,
-                "untagged_thumb_path": image.untagged_thumb_path,
                 "tags": [tag.name for tag in image.tags],
                 "date_added": image.date_added.isoformat() if image.date_added else None,
                 "author": image.author.name if image.author else None
-            }
-            response.append(image_data)
+            })
             
         return response
 
     except Exception as e:
+        logger.error(f"Error in search_images: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Failed to search images: {str(e)}"
+        )
+        
+@router.get("/preview/{size}/{image_id}")
+async def get_preview(
+    size: str,
+    image_id: int, 
+    db: Session = Depends(get_db)
+):
+    """Get pre-generated preview image."""
+    try:
+        if size not in ['preview', 'search']:
+            raise HTTPException(status_code=400, detail="Invalid preview size")
+            
+        image = get_image(db, image_id)
+        if not image:
+            raise HTTPException(status_code=404, detail="Image not found")
+        
+        # Use the stored preview path directly from the database
+        preview_path = image.search_preview_path if size == 'search' else image.tag_preview_path
+        
+        if not preview_path or not os.path.exists(preview_path):
+            raise HTTPException(status_code=404, detail=f"Preview not found at {preview_path}")
+            
+        return FileResponse(preview_path)
+        
+    except Exception as e:
+        logger.error(f"Error retrieving preview: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error retrieving preview: {str(e)}"
         )

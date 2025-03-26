@@ -10,9 +10,9 @@ class Image(Base):
     
     # Split path components - all optional
     tagged_full_path = Column(String, nullable=True)
-    tagged_thumb_path = Column(String, nullable=True)
+    search_preview_path = Column(String, nullable=True)
+    tag_preview_path = Column(String, nullable=True)
     untagged_full_path = Column(String, nullable=True)
-    untagged_thumb_path = Column(String, nullable=True)
     date_added = Column(DateTime, nullable=False, default=datetime.utcnow)
     author_id = Column(Integer, ForeignKey('authors.id'), nullable=True)
 

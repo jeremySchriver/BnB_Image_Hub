@@ -7,9 +7,9 @@ from .author import AuthorResponse
 class ImageCreate(BaseModel):
     filename: str
     tagged_full_path: Optional[str] = None
-    tagged_thumb_path: Optional[str] = None
+    search_preview_path: Optional[str] = None
+    tag_preview_path: Optional[str] = None
     untagged_full_path: Optional[str] = None
-    untagged_thumb_path: Optional[str] = None
     tag_ids: Optional[List[str]] = []
     author_id: Optional[int] = None
 
@@ -17,9 +17,9 @@ class ImageResponse(BaseModel):
     id: int
     filename: str
     tagged_full_path: Optional[str] = None
-    tagged_thumb_path: Optional[str] = None
+    search_preview_path: Optional[str] = None
+    tag_preview_path: Optional[str] = None
     untagged_full_path: Optional[str] = None
-    untagged_thumb_path: Optional[str] = None
     tags: List[TagResponse]
     date_added: datetime
     author: Optional[AuthorResponse] = None

@@ -210,3 +210,7 @@ export const searchAuthors = async (query: string): Promise<Author[]> => {
 export const getUntaggedPreviewUrl = (imageId: string, maxSize: number = 800): string => {
   return `${BASE_URL}/preview/untagged/preview/${imageId}?max_size=${maxSize}`;
 };
+
+export const getPreviewUrl = (imageId: string, size: 'preview' | 'search'): string => {
+  return `${BASE_URL}/images/preview/${size}/${imageId}`;
+};
