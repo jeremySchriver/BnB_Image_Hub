@@ -214,3 +214,7 @@ export const getUntaggedPreviewUrl = (imageId: string, maxSize: number = 800): s
 export const getPreviewUrl = (imageId: string, size: 'preview' | 'search'): string => {
   return `${BASE_URL}/images/preview/${size}/${imageId}`;
 };
+
+export const getActualImage = (imageId: string): string => {
+  return `${BASE_URL}/images/content/${imageId}`;
+};

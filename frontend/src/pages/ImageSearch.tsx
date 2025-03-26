@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search as SearchIcon, Tag, Filter, X, HelpCircle, User } from 'lucide-react';
+import { Search as SearchIcon, Tag, Filter, X, HelpCircle, User, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import TransitionWrapper from '@/components/TransitionWrapper';
 import Button from '@/components/Button';
@@ -8,7 +8,7 @@ import ImageCard from '@/components/ImageCard';
 import TagInput from '@/components/TagInput';
 import AuthorInput from '@/components/AuthorInput';
 import { cn } from '@/lib/utils';
-import { searchImages, getPreviewUrl } from '@/utils/api';
+import { searchImages, getPreviewUrl, getActualImage } from '@/utils/api';
 import type { ImageMetadata } from '@/utils/api';
 
 const ImageSearch = () => {
@@ -63,6 +63,31 @@ const ImageSearch = () => {
       setImages([]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Expanded view download functionality
+  const handleDownload = async (imageId: string) => {
+    try {
+      const response = await fetch(getActualImage(imageId));
+      if (!response.ok) throw new Error('Download failed');
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      
+      // Get the content-type from the response to determine file extension
+      const contentType = response.headers.get('content-type');
+      const extension = contentType ? `.${contentType.split('/')[1]}` : '';
+      a.download = `image-${imageId}${extension}`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Failed to download image:', error);
+      toast.error('Failed to download image');
     }
   };
 
@@ -230,6 +255,14 @@ const ImageSearch = () => {
               </div>
               
               <div className="p-4 border-t border-border flex justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => handleDownload(selectedImage.id)}
+                  className="flex items-center gap-2"
+                >
+                  <Download className="h-4 w-4" />
+                  Download
+                </Button>
                 <Button
                   variant="outline"
                   onClick={closeModal}
