@@ -34,6 +34,35 @@ export interface Author {
   date_added: string;
 }
 
+interface SearchFilters {
+  tags?: string[];
+  author?: string;
+}
+
+export const searchImages = async (filters: SearchFilters): Promise<ImageMetadata[]> => {
+  const params = new URLSearchParams();
+  
+  if (filters.tags && filters.tags.length > 0) {
+    params.append('tags', filters.tags.join(','));
+  }
+  
+  if (filters.author) {
+    params.append('author', filters.author);
+  }
+  
+  const response = await fetch(`${BASE_URL}/images/search?${params.toString()}`, {
+    headers: {
+      ...authHeader()
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to search images');
+  }
+  
+  return response.json();
+};
+
 // Helper for handling HTTP errors
 const handleResponse = async (response: Response) => {
   if (!response.ok) {
@@ -111,17 +140,6 @@ export const uploadImages = async (files: File[]): Promise<{ success: boolean, m
   return handleResponse(response);
 };
 
-// Search images
-export const searchImages = async (query: string): Promise<ImageMetadata[]> => {
-  const response = await fetch(`${BASE_URL}/images/search?q=${encodeURIComponent(query)}`, {
-    headers: {
-      ...authHeader()
-    }
-  });
-  
-  return handleResponse(response);
-};
-
 // Get image URL
 export const getImageUrl = (imageId: string): string => {
   return `${BASE_URL}/images/${imageId}/content`;
@@ -191,4 +209,41 @@ export const searchAuthors = async (query: string): Promise<Author[]> => {
 
 export const getUntaggedPreviewUrl = (imageId: string, maxSize: number = 800): string => {
   return `${BASE_URL}/preview/untagged/preview/${imageId}?max_size=${maxSize}`;
+};
+
+export const getPreviewUrl = (imageId: string, size: 'preview' | 'search'): string => {
+  return `${BASE_URL}/images/preview/${size}/${imageId}`;
+};
+
+export const getActualImage = (imageId: string): string => {
+  return `${BASE_URL}/images/content/${imageId}`;
+};
+
+export const getImageById = async (imageId: number): Promise<ImageMetadata> => {
+  const response = await fetch(`${BASE_URL}/images/search/${imageId}`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch image');
+  }
+  return response.json();
+};
+
+export const updateImageMetadata = async (
+  imageId: number,
+  updateData: UpdateImageTagsData
+): Promise<ImageMetadata> => {
+  const response = await fetch(`${BASE_URL}/images/metadata/${imageId}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeader()
+    },
+    body: JSON.stringify(updateData)
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.detail || 'Failed to update image metadata');
+  }
+
+  return response.json();
 };

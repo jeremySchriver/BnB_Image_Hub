@@ -75,17 +75,22 @@ def purge_image_table(db: Session):
 # Move files from seed_images to un-tagged folder
 def move_files_to_untagged_folder():
     seed_folder_path = "E:\\Code_Projects\\Image_Tagger\\file_share\\seed_images"
+    tagged_folder_path = "E:\\Code_Projects\\Image_Tagger\\file_share\\tagged"
 
     for filename in os.listdir(seed_folder_path):
-        source_path = os.path.join(seed_folder_path, filename)
-        print(source_path)
-        
-        target_path = source_path.replace('seed_images', 'un-tagged')
-        print(target_path)
-        
-        if os.path.isfile(source_path):
-            shutil.copy(source_path, target_path)
-            print(f'Moved: {source_path} -> {target_path}')
+        # Add a check to ensure the file isn't already in the desired location
+        if filename not in os.listdir(tagged_folder_path):
+            source_path = os.path.join(seed_folder_path, filename)
+            print(source_path)
+            
+            target_path = source_path.replace('seed_images', 'un-tagged')
+            print(target_path)
+            
+            if os.path.isfile(source_path):
+                shutil.copy(source_path, target_path)
+                print(f'Moved: {source_path} -> {target_path}')
+        else:
+            continue
             
 def main():
     db = next(get_db()) 

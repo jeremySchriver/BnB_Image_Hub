@@ -1,26 +1,81 @@
-'''Methods to generate thumbnails for images.'''
+'''Methods to generate preview images for different use cases.'''
 from PIL import Image
 import os
+import logging
 
-def generate_thumbnail(source_path: str, destination_path: str, size: tuple = (200, 200)):
-    """Generate a thumbnail from source image and save it to destination path."""
+from backend.config import TAG_PREVIEW_DIR, SEARCH_PREVIEW_DIR
+
+logger = logging.getLogger(__name__)
+
+def generate_previews(source_path: str, new_filename: str = None) -> bool:
+    """Generate preview images at different sizes for different use cases."""
     try:
-        # Ensure destination directory exists
-        os.makedirs(os.path.dirname(destination_path), exist_ok=True)
+        # Ensure destination directories exist
+        os.makedirs(TAG_PREVIEW_DIR, exist_ok=True)
+        os.makedirs(SEARCH_PREVIEW_DIR, exist_ok=True)
         
-        # Open and generate thumbnail
+        # Map preview types to their directories and dimensions
+        preview_configs = {
+            'preview': {
+                'dir': TAG_PREVIEW_DIR,
+                'size': (800, 800)      # Full preview for tagging page
+            },
+            'search': {
+                'dir': SEARCH_PREVIEW_DIR,
+                'size': (400, 400)      # Smaller preview for search grid
+            }
+        }
+        
+        # Determine filename to use
+        if new_filename:
+            # Use new filename without extension
+            base_filename = os.path.splitext(new_filename)[0]
+        else:
+            # Use original filename without extension
+            filename = os.path.basename(source_path)
+            base_filename = os.path.splitext(filename)[0]
+        
         with Image.open(source_path) as img:
-            # Convert to RGB if necessary
+            # Convert RGBA/P images to RGB with white background
             if img.mode in ('RGBA', 'P'):
-                img = img.convert('RGB')
+                background = Image.new('RGB', img.size, 'white')
+                if img.mode == 'RGBA':
+                    background.paste(img, mask=img.split()[3])
+                else:
+                    background.paste(img)
+                img = background
             
-            # Generate thumbnail
-            img.thumbnail(size, Image.Resampling.LANCZOS)
-            
-            # Save thumbnail
-            img.save(destination_path, "JPEG", quality=85)
-            
+            # Generate both preview sizes
+            for preview_type, config in preview_configs.items():
+                preview_path = os.path.join(
+                    config['dir'],
+                    f"{base_filename}.jpg"  # Simplified filename without type suffix
+                )
+                
+                # Create a copy to avoid modifying original
+                img_copy = img.copy()
+                
+                # Calculate new size maintaining aspect ratio
+                width, height = img_copy.size
+                dimensions = config['size']
+                ratio = min(dimensions[0]/width, dimensions[1]/height)
+                
+                # Only resize if image is larger than target size
+                if ratio < 1:
+                    new_size = (int(width * ratio), int(height * ratio))
+                    img_copy = img_copy.resize(new_size, Image.Resampling.LANCZOS)
+                
+                # Save preview with optimization
+                img_copy.save(
+                    preview_path,
+                    "JPEG",
+                    quality=85,
+                    optimize=True
+                )
+                logger.info(f"Generated {preview_type} preview at {preview_path}")
+                
         return True
+        
     except Exception as e:
-        print(f"Error generating thumbnail: {str(e)}")
+        logger.error(f"Error generating previews for {source_path}: {str(e)}")
         return False

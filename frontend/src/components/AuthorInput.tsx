@@ -24,14 +24,21 @@ const AuthorInput: React.FC<AuthorInputProps> = ({
   const debouncedInput = useDebounce(inputValue, 300);
 
   useEffect(() => {
+    setInputValue(value);
+  }, [value]);
+
+  useEffect(() => {
     const fetchSuggestions = async () => {
-      if (debouncedInput.trim().length > 0) {
+      // Only fetch suggestions if we're not displaying a selected value
+      if (debouncedInput.trim().length > 0 && debouncedInput !== value) {
         try {
           const authorSuggestions = await searchAuthors(debouncedInput);
           setSuggestions(authorSuggestions.map(author => author.name));
           setShowSuggestions(true);
         } catch (error) {
           console.error('Failed to fetch author suggestions:', error);
+          setSuggestions([]);
+          setShowSuggestions(false);
         }
       } else {
         setSuggestions([]);
@@ -40,14 +47,28 @@ const AuthorInput: React.FC<AuthorInputProps> = ({
     };
 
     fetchSuggestions();
-  }, [debouncedInput]);
+  }, [debouncedInput, value]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setInputValue(e.target.value);
-    onChange(e.target.value);
+  const handleSelection = (selectedValue: string) => {
+    setInputValue(selectedValue);
+    onChange(selectedValue);
+    setSuggestions([]); // Clear suggestions immediately
+    setShowSuggestions(false);
     setSelectedIndex(-1);
   };
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+    setInputValue(newValue);
+    if (!newValue.trim()) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      onChange('');
+    }
+    setSelectedIndex(-1);
+  };
+  
+  // Update the keydown handler
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
@@ -57,9 +78,7 @@ const AuthorInput: React.FC<AuthorInputProps> = ({
       setSelectedIndex(prev => Math.max(prev - 1, -1));
     } else if (e.key === 'Enter' && selectedIndex >= 0) {
       e.preventDefault();
-      setInputValue(suggestions[selectedIndex]);
-      onChange(suggestions[selectedIndex]);
-      setShowSuggestions(false);
+      handleSelection(suggestions[selectedIndex]);
     } else if (e.key === 'Escape') {
       setShowSuggestions(false);
     }
@@ -86,11 +105,7 @@ const AuthorInput: React.FC<AuthorInputProps> = ({
           {suggestions.map((suggestion, index) => (
             <button
               key={suggestion}
-              onClick={() => {
-                setInputValue(suggestion);
-                onChange(suggestion);
-                setShowSuggestions(false);
-              }}
+              onClick={() => handleSelection(suggestion)}
               className={cn(
                 "w-full text-left px-3 py-2 text-sm hover:bg-secondary transition-colors",
                 index === selectedIndex && "bg-secondary"

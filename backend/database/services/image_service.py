@@ -4,10 +4,11 @@ from ..models.image import Image
 from ..schemas.image import ImageCreate
 from ..models.tag import Tag
 from ..schemas.tag import TagCreate
-from ...processor.thumbnail_generator import generate_thumbnail
+from ...processor.thumbnail_generator import generate_previews
 from .tag_service import create_tag, get_tag_by_partial_name
 from ..services.author_service import get_author_by_name, create_author
 from ..schemas.author import AuthorCreate
+from backend.config import TAGGED_DIR
 from typing import List, Optional
 import os
 import shutil
@@ -59,6 +60,60 @@ def _generate_hash_filename(original_filename: str) -> str:
     # Combine timestamp and random chars
     return f"{timestamp}-{random_chars}{extension}"
 
+def update_image_metadata(
+    db: Session, 
+    image_id: int, 
+    tags: List[str], 
+    author: Optional[str] = None
+) -> Optional[Image]:
+    """Update image tags and author without file operations."""
+    try:
+        # Get image record
+        image = get_image(db, image_id)
+        if not image:
+            return None
+
+        # Process tags
+        image.tags = []  # Clear existing tags
+        for tag_name in tags:
+            tag_name = tag_name.strip().lower()
+            existing_tag = get_tag_by_partial_name(db, tag_name, limit=1)
+            if existing_tag and existing_tag[0].name == tag_name:
+                tag = existing_tag[0]
+            else:
+                tag = create_tag(db, TagCreate(name=tag_name))
+            image.tags.append(tag)
+        
+        # Update author - now handles removal properly
+        if author is None or author.strip() == '':
+            # Remove author reference
+            image.author_id = None
+        else:
+            # Add or update author
+            existing_author = get_author_by_name(db, author.strip())
+            if existing_author:
+                image.author_id = existing_author.id
+            else:
+                new_author = create_author(db, AuthorCreate(
+                    name=author.strip(),
+                    email=f"{author.strip().replace(' ', '_')}@placeholder.com"
+                ))
+                image.author_id = new_author.id
+
+        db.commit()
+        db.refresh(image)
+        return image
+
+    except Exception as e:
+        db.rollback()
+        print(f"Database operation error: {str(e)}")
+        raise e
+
+    except Exception as e:
+        db.rollback()
+        print(f"Database operation error: {str(e)}")
+        raise e
+
 def update_image_tags(
     db: Session, 
     image_id: int, 
@@ -77,25 +132,19 @@ def update_image_tags(
         image.tags = []  # Clear existing tags
         for tag_name in tags:
             tag_name = tag_name.strip().lower()
-            # Try to find existing tag
             existing_tag = get_tag_by_partial_name(db, tag_name, limit=1)
             if existing_tag and existing_tag[0].name == tag_name:
                 tag = existing_tag[0]
             else:
-                # Create new tag if it doesn't exist
                 tag = create_tag(db, TagCreate(name=tag_name))
-            
-            # Add tag to image's tags collection
             image.tags.append(tag)
         
         # 2. Update author if provided
         if author is not None:
-            # Try to find existing author
             existing_author = get_author_by_name(db, author.strip())
             if existing_author:
                 image.author_id = existing_author.id
             else:
-                # Create new author if doesn't exist
                 new_author = create_author(db, AuthorCreate(
                     name=author.strip(),
                     email=f"{author.strip().replace(' ', '_')}@placeholder.com"
@@ -113,30 +162,19 @@ def update_image_tags(
                 hashed_filename = _generate_hash_filename(original_filename)
                 image.filename = hashed_filename
 
-                # Set up paths
-                base_dir = os.path.dirname(os.path.dirname(image.untagged_full_path))
-                tagged_dir = os.path.join(base_dir, 'tagged')
-                thumbnail_dir = os.path.join(base_dir, 'thumbnails')
-                
-                # Ensure directories exist
-                os.makedirs(tagged_dir, exist_ok=True)
-                os.makedirs(thumbnail_dir, exist_ok=True)
-
                 # Set up new file paths
-                tagged_path = os.path.join(tagged_dir, hashed_filename)
-                thumbnail_path = os.path.join(thumbnail_dir, hashed_filename)
+                tagged_path = os.path.join(TAGGED_DIR, hashed_filename)
 
-                # Generate and save thumbnail
-                if generate_thumbnail(image.untagged_full_path, thumbnail_path):
-                    image.tagged_thumb_path = thumbnail_path
+                # Generate preview images
+                if generate_previews(image.untagged_full_path):
+                    print(f"Generated previews for {hashed_filename}")
+                else:
+                    print(f"Failed to generate previews for {hashed_filename}")
 
                 # Move original image to tagged folder
                 shutil.move(image.untagged_full_path, tagged_path)
                 image.tagged_full_path = tagged_path
-                
-                # Clear untagged paths
                 image.untagged_full_path = None
-                image.untagged_thumb_path = None
 
                 # Commit file changes
                 db.commit()
@@ -145,7 +183,6 @@ def update_image_tags(
             except Exception as file_error:
                 print(f"File operation error: {str(file_error)}")
                 # Don't raise the error - we've already saved the tags and author
-                # Just log it and continue
 
         return image
 
@@ -256,9 +293,9 @@ def cast_constant_to_db(db: Session, image_data: ImageCreate) -> Image:
     db_image = Image(
         filename=image_data.filename,
         tagged_full_path=image_data.tagged_full_path,
-        tagged_thumb_path=image_data.tagged_thumb_path,
+        search_preview_path=image_data.search_preview_path,
+        tag_preview_path=image_data.tag_preview_path,
         untagged_full_path=image_data.untagged_full_path,
-        untagged_thumb_path=image_data.untagged_thumb_path,
         author_id=image_data.author_id
     )
     db.add(db_image)

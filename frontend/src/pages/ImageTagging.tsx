@@ -8,7 +8,7 @@ import TagInput from '@/components/TagInput';
 import { updateImageTags, getNextUntaggedImage } from '@/utils/api';
 import type { ImageMetadata } from '@/utils/api';
 import AuthorInput from '@/components/AuthorInput';
-import { getUntaggedPreviewUrl } from '@/utils/api';
+import { getPreviewUrl } from '@/utils/api';
 
 
 const ImageTagging = () => {
@@ -107,17 +107,13 @@ const ImageTagging = () => {
           </div>
         ) : (
           <div className="space-y-4 mt-[72px]">
-            {/* Image preview - reduced height by 100px from calc(100vh-180px) to calc(100vh-280px) */}
+            {/* Image preview */}
             <div className="h-[calc(100vh-280px)] flex items-center justify-center bg-secondary/30">
               <img
-                src={getUntaggedPreviewUrl(currentImage.id)}
+                src={getPreviewUrl(currentImage.id, 'preview')}
                 alt={currentImage.filename}
                 className="max-h-full max-w-full object-contain rounded-lg"
                 loading="lazy"
-                onError={(e) => {
-                  console.error('Error loading image:', e);
-                  toast.error('Failed to load image preview');
-                }}
               />
             </div>
 
