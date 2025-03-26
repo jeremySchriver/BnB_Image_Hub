@@ -161,61 +161,31 @@ const ImageUpload = () => {
       clearInterval(progressInterval);
       
       if (response.success) {
-        // Mark all as complete
+        const failedCount = response.failed?.length || 0;
+        const successCount = files.length - failedCount;
+        
+        // Update file statuses
         setFiles(prev => 
           prev.map(file => ({
             ...file,
-            status: 'success',
-            progress: 100
+            status: response.failed?.includes(file.file.name) ? 'error' : 'success',
+            progress: 100,
+            error: response.failed?.includes(file.file.name) ? 'Failed to process image' : undefined
           }))
         );
         
-        toast.success(`Successfully uploaded ${files.length} images`);
-        
-        // Clear files after a delay
-        setTimeout(() => {
-          setFiles([]);
-        }, 2000);
-      } else {
-        // Handle partial failures if the API returns them
-        if (response.failed && response.failed.length > 0) {
-          setFiles(prev => 
-            prev.map(file => {
-              if (response.failed?.includes(file.file.name)) {
-                return {
-                  ...file,
-                  status: 'error',
-                  progress: 100,
-                  error: 'Failed to upload'
-                };
-              }
-              return {
-                ...file,
-                status: 'success',
-                progress: 100
-              };
-            })
-          );
-          
-          toast.error(`Failed to upload ${response.failed.length} files`);
+        // Show appropriate toast
+        if (failedCount > 0) {
+          toast.error(`${failedCount} files failed to upload`);
+          toast.success(`${successCount} files uploaded successfully`);
         } else {
-          // Mark all as error
-          setFiles(prev => 
-            prev.map(file => ({
-              ...file,
-              status: 'error',
-              progress: 100,
-              error: 'Upload failed'
-            }))
-          );
-          
-          toast.error('Failed to upload images');
+          toast.success(response.message);
+          // Clear files after success
+          setTimeout(() => setFiles([]), 2000);
         }
       }
     } catch (error) {
       console.error('Upload error:', error);
-      
-      // Mark all as error
       setFiles(prev => 
         prev.map(file => ({
           ...file,
@@ -224,7 +194,6 @@ const ImageUpload = () => {
           error: error instanceof Error ? error.message : 'Upload failed'
         }))
       );
-      
       toast.error('Failed to upload images. Please try again.');
     } finally {
       setIsUploading(false);

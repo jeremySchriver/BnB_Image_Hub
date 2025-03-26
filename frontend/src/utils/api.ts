@@ -113,31 +113,31 @@ export const isDemoMode = (): boolean => {
 };
 
 // Image upload functions
-export const uploadImages = async (files: File[]): Promise<{ success: boolean, message: string, failed?: string[] }> => {
-  // If in demo mode, return a mock success response
-  if (isDemoMode()) {
-    return new Promise(resolve => 
-      setTimeout(() => {
-        resolve({ success: true, message: 'Demo: Images uploaded successfully' });
-      }, 1500)
-    );
-  }
-  
+export const uploadImages = async (files: File[]): Promise<{ 
+  success: boolean, 
+  message: string, 
+  failed?: string[] 
+}> => {
   const formData = new FormData();
   
   files.forEach(file => {
     formData.append('files', file);
   });
   
-  const response = await fetch(`${BASE_URL}/images/upload`, {
+  const response = await fetch(`${BASE_URL}/images/upload/batch`, {
     method: 'POST',
     headers: {
       ...authHeader()
     },
     body: formData
   });
-  
-  return handleResponse(response);
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.detail || 'Failed to upload images');
+  }
+
+  return response.json();
 };
 
 // Get image URL

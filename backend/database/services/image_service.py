@@ -17,6 +17,9 @@ import random
 import string
 from datetime import datetime
 from pathlib import Path
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 '''Tag methods'''
@@ -210,19 +213,37 @@ def update_image_paths(
 
 '''Store images in the database'''
 def create_image(db: Session, image_data: ImageCreate):
-    image = Image(
-        filename=image_data.filename,
-        tagged_full_path=image_data.tagged_full_path,
-        tagged_thumb_path=image_data.tagged_thumb_path,
-        untagged_full_path=image_data.untagged_full_path,
-        untagged_thumb_path=image_data.untagged_thumb_path,
-        tags=_convert_tags_to_string(image_data.tags),
-        author=image_data.author
-    )
-    db.add(image)
-    db.commit()
-    db.refresh(image)
-    return image
+    """Create a new image record in the database."""
+    try:
+        image = Image(
+            filename=image_data.filename,
+            tagged_full_path=image_data.tagged_full_path,
+            search_preview_path=image_data.search_preview_path,
+            tag_preview_path=image_data.tag_preview_path,
+            untagged_full_path=image_data.untagged_full_path,
+        )
+        
+        if image_data.author:
+            # Handle author if provided
+            existing_author = get_author_by_name(db, image_data.author.strip())
+            if existing_author:
+                image.author_id = existing_author.id
+            else:
+                new_author = create_author(db, AuthorCreate(
+                    name=image_data.author.strip(),
+                    email=f"{image_data.author.strip().replace(' ', '_')}@placeholder.com"
+                ))
+                image.author_id = new_author.id
+
+        db.add(image)
+        db.commit()
+        db.refresh(image)
+        return image
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error creating image record: {str(e)}")
+        raise
 
 def save_image(db: Session, file: UploadFile, author: Optional[str] = None):
     image = Image(

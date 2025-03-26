@@ -1,18 +1,20 @@
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, File, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import os
 import logging
+import shutil
 
 from backend.database.database import get_db
 from backend.database.models.image import Image
-from backend.database.schemas.image import ImageResponse, ImageUpdate
+from backend.database.schemas.image import ImageResponse, ImageUpdate, ImageCreate
 from backend.database.schemas.tag import TagResponse
 from backend.database.models.tag import Tag
 from backend.database.models.author import Author
-from backend.database.services.image_service import get_image, get_all_untagged_images, get_next_untagged_image, update_image_tags, update_image_metadata
-from backend.config import TAG_PREVIEW_DIR, SEARCH_PREVIEW_DIR
+from backend.database.services.image_service import get_image, get_all_untagged_images, get_next_untagged_image, update_image_tags, update_image_metadata, _generate_hash_filename, create_image
+from backend.config import TAG_PREVIEW_DIR, SEARCH_PREVIEW_DIR, UNTAGGED_DIR
+from backend.processor.thumbnail_generator import generate_previews
 
 logger = logging.getLogger(__name__)
 
@@ -360,4 +362,73 @@ def update_metadata(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to update image metadata: {str(e)}"
+        )
+        
+@router.post("/upload/batch")
+async def upload_batch_images(
+    files: List[UploadFile] = File(...),
+    db: Session = Depends(get_db)
+):
+    """Upload multiple images at once."""
+    try:
+        results = {
+            "success": True,
+            "message": "",
+            "failed": []
+        }
+        
+        for file in files:
+            try:
+                # Generate unique filename (without extension)
+                original_filename = os.path.splitext(file.filename)[0]
+                hashed_filename = _generate_hash_filename(original_filename)
+                
+                # Get original extension
+                file_extension = os.path.splitext(file.filename)[1].lower()
+                
+                # Set up paths
+                untagged_path = os.path.join(UNTAGGED_DIR, f"{hashed_filename}{file_extension}")
+                
+                # Ensure directory exists
+                os.makedirs(os.path.dirname(untagged_path), exist_ok=True)
+                
+                # Save file to untagged directory
+                with open(untagged_path, "wb") as buffer:
+                    shutil.copyfileobj(file.file, buffer)
+                
+                # Create database record
+                image_data = ImageCreate(
+                    filename=hashed_filename,
+                    untagged_full_path=untagged_path,
+                    tag_preview_path=os.path.join(TAG_PREVIEW_DIR, f"{hashed_filename}.jpg"),
+                    search_preview_path=os.path.join(SEARCH_PREVIEW_DIR, f"{hashed_filename}.jpg")
+                )
+                
+                # Create image record first
+                new_image = create_image(db, image_data)
+                
+                # Generate preview images after DB record exists
+                if generate_previews(untagged_path, hashed_filename):
+                    logger.info(f"Generated previews for {hashed_filename}")
+                else:
+                    logger.error(f"Failed to generate previews for {hashed_filename}")
+                    results["failed"].append(file.filename)
+                    
+            except Exception as e:
+                logger.error(f"Error processing file {file.filename}: {str(e)}")
+                results["failed"].append(file.filename)
+                
+        # Set appropriate message
+        if len(results["failed"]) > 0:
+            results["message"] = f"Uploaded {len(files) - len(results['failed'])} files, {len(results['failed'])} failed"
+        else:
+            results["message"] = f"Successfully uploaded {len(files)} files"
+            
+        return results
+        
+    except Exception as e:
+        logger.error(f"Upload batch error: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Upload failed: {str(e)}"
         )
