@@ -17,6 +17,8 @@ import {
   deleteImage 
 } from '@/utils/api';
 import type { ImageMetadata } from '@/utils/api';
+import ImageDetailModal from '@/components/ImageDetailModal';
+import DeleteConfirmationDialog from '@/components/DeleteConfirmationDialog';
 
 const ImageSearch = () => {
   // ===============================
@@ -65,6 +67,18 @@ const ImageSearch = () => {
     }
   }, [filterTags, filterAuthor, hasInitialized]);
 
+  useEffect(() => {
+    if (selectedImage) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [selectedImage]);
+
   // ===============================
   // Data Fetching Functions
   // ===============================
@@ -92,74 +106,13 @@ const ImageSearch = () => {
   // ===============================
   // Event Handlers
   // ===============================
-  const handleDownload = async (imageId: string) => {
-    try {
-      const response = await fetch(getActualImage(imageId));
-      if (!response.ok) throw new Error('Download failed');
-      
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      
-      const contentType = response.headers.get('content-type');
-      const extension = contentType ? `.${contentType.split('/')[1]}` : '';
-      a.download = `image-${imageId}${extension}`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    } catch (error) {
-      console.error('Failed to download image:', error);
-      toast.error('Failed to download image');
-    }
-  };
-
-  const handleEditStart = () => {
-    if (selectedImage) {
-      setEditTags(selectedImage.tags);
-      setEditAuthor(selectedImage.author);
-      setIsEditing(true);
-    }
-  };
-
-  const handleSaveEdit = async () => {
-    if (!selectedImage) return;
-    
-    try {
-      const imageId = parseInt(selectedImage.id);
-      const updateData = {
-        tags: editTags,
-        author: editAuthor
-      };
-  
-      // If image is untagged (has untagged_full_path), use updateImageTags
-      if (selectedImage.untagged_full_path) {
-        await updateImageTags(imageId, updateData);
-      } else {
-        await updateImageMetadata(imageId, updateData);
-      }
-  
-      // Refresh search results with current filters
-      const filters = {
-        tags: filterTags,
-        author: filterAuthor
-      };
-      const updatedImages = await searchImages(filters);
-      setImages(updatedImages);
-      
-      // Update selected image with fresh data
-      const updatedSelectedImage = updatedImages.find(img => img.id === selectedImage.id);
-      if (updatedSelectedImage) {
-        setSelectedImage(updatedSelectedImage);
-      }
-      
-      setIsEditing(false);
-      toast.success('Changes saved successfully');
-    } catch (error) {
-      console.error('Failed to update image:', error);
-      toast.error('Failed to save changes');
-    }
+  const handleImageUpdate = (updatedImage: ImageMetadata) => {
+    setImages(prev => 
+      prev.map(img => 
+        img.id === updatedImage.id ? updatedImage : img
+      )
+    );
+    setSelectedImage(updatedImage);
   };
 
   const handleDelete = async () => {
@@ -290,226 +243,24 @@ const ImageSearch = () => {
             </div>
           )}
         </div>
-
-        {/* Image Detail Modal */}
-        {selectedImage && (
-          <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-card border border-border rounded-xl shadow-elevation max-w-4xl w-full max-h-[90vh] flex flex-col animate-fade-in">
-              {/* Modal Header */}
-              <div className="p-4 border-b border-border flex items-center justify-between">
-                <h3 className="text-lg font-medium">Image Details</h3>
-                <button
-                  onClick={closeModal}
-                  className="p-1 rounded-full hover:bg-secondary transition-colors"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-              
-              {/* Modal Content */}
-              <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
-                {/* Image Preview */}
-                <div className="md:w-2/3 p-4 flex items-center justify-center bg-secondary/30">
-                  <img
-                    src={getPreviewUrl(selectedImage.id, 'preview')}
-                    alt={`Image ${selectedImage.id}`}
-                    className="max-h-[60vh] max-w-full object-contain"
-                  />
-                </div>
-                
-                {/* Image Details */}
-                <div className="md:w-1/3 p-4 border-t md:border-t-0 md:border-l border-border overflow-y-auto">
-                  <div className="space-y-4">
-                    {!isEditing ? (
-                      <>
-                        {/* Author Information */}
-                        <div>
-                          <div className="flex justify-between items-center">
-                            <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                              <User className="h-3.5 w-3.5" />
-                              Author
-                            </h4>
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              onClick={handleEditStart}
-                              className="text-xs"
-                            >
-                              Edit Details
-                            </Button>
-                          </div>
-                          <p className="mt-1 font-medium">
-                            {selectedImage.author || 'No author'}
-                          </p>
-                        </div>
-                        
-                        {/* Tags Information */}
-                        <div>
-                          <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                            <Tag className="h-3.5 w-3.5" />
-                            Tags
-                          </h4>
-                          {selectedImage.tags && selectedImage.tags.length > 0 ? (
-                            <div className="mt-2 flex flex-wrap gap-1.5">
-                              {selectedImage.tags.map((tag, index) => (
-                                <span key={index} className="px-2 py-0.5 bg-secondary text-xs rounded-full">
-                                  {tag}
-                                </span>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="mt-1 text-sm text-muted-foreground">No tags</p>
-                          )}
-                        </div>
-
-                        {/* File Information */}
-                        <div>
-                          <h4 className="text-s font-semibold mb-2">File Information</h4>
-                          <div className="space-y-1.5 text-xs">
-                            <div className="flex justify-between items-center">
-                              <span className="text-muted-foreground">Filename:</span>
-                              <span className="font-xs truncate ml-2 text-right max-w-[180px]">
-                                {selectedImage.filename}
-                              </span>
-                            </div>
-                            
-                            <div className="flex justify-between items-center">
-                              <span className="text-muted-foreground">Date Added:</span>
-                              <span className="font-xs">
-                                {new Date(selectedImage.date_added).toLocaleDateString('en-US', {
-                                  year: 'numeric',
-                                  month: 'short',
-                                  day: 'numeric'
-                                })}
-                              </span>
-                            </div>
-                            
-                            <div className="flex justify-between items-center">
-                              <span className="text-muted-foreground">File Size</span>
-                              <span className="font-xs truncate ml-2 text-right max-w-[180px]">
-                                {formatFileSize(selectedImage.file_size)}
-                              </span>
-                            </div>
-
-                            <div className="flex justify-between items-center">
-                              <span className="text-muted-foreground">File Type:</span>
-                              <span className="font-xs truncate ml-2 text-right max-w-[180px]">
-                                {selectedImage.file_type}
-                              </span>
-                            </div>
-
-                            <div className="flex justify-between items-center">
-                              <span className="text-muted-foreground">Dimensions:</span>
-                              <span className="font-xs truncate ml-2 text-right max-w-[180px]">
-                                {selectedImage.width} × {selectedImage.height}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="space-y-4">
-                        <div>
-                          <label className="text-sm font-medium mb-2 inline-flex items-center gap-2">
-                            <User className="h-4 w-4" />
-                            Author
-                          </label>
-                          <AuthorInput
-                            value={editAuthor}
-                            onChange={setEditAuthor}
-                            placeholder="Enter author name..."
-                          />
-                        </div>
-                        
-                        <div>
-                          <label className="text-sm font-medium mb-2 inline-flex items-center gap-2">
-                            <Tag className="h-4 w-4" />
-                            Tags
-                          </label>
-                          <TagInput
-                            value={editTags}
-                            onChange={setEditTags}
-                            placeholder="Add tags..."
-                          />
-                        </div>
-
-                        <div className="flex justify-end gap-2 pt-4">
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => setIsEditing(false)}
-                          >
-                            Cancel
-                          </Button>
-                          <Button 
-                            size="sm"
-                            onClick={handleSaveEdit}
-                          >
-                            Save Changes
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-              
-              {/* Modal Footer */}
-              <div className="p-4 border-t border-border flex justify-end gap-2">
-                {!isEditing && (
-                  <>
-                    <Button
-                      variant="outline"
-                      onClick={() => handleDownload(selectedImage.id)}
-                      className="flex items-center gap-2"
-                    >
-                      <Download className="h-4 w-4" />
-                      Download
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      onClick={() => setShowDeleteConfirm(true)}
-                      className="flex items-center gap-2"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      Delete
-                    </Button>
-                  </>
-                )}
-                <Button variant="outline" onClick={closeModal}>
-                  Close
-                </Button>
-              </div>
-
-              {/* Delete Confirmation Dialog */}
-              {showDeleteConfirm && (
-                <div className="fixed inset-0 z-[60] bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
-                  <div className="bg-card border border-border rounded-lg shadow-elevation p-6 max-w-md w-full animate-fade-in">
-                    <h3 className="text-lg font-medium mb-2">Delete Image</h3>
-                    <p className="text-muted-foreground mb-4">
-                      Are you sure you want to delete this image? This action cannot be undone.
-                    </p>
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        variant="outline"
-                        onClick={() => setShowDeleteConfirm(false)}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        onClick={handleDelete}
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
       </TransitionWrapper>
+
+      {/* Modals */}
+      {selectedImage && (
+        <ImageDetailModal
+          image={selectedImage}
+          onClose={() => setSelectedImage(null)}
+          onDelete={() => setShowDeleteConfirm(true)}
+          onUpdate={handleImageUpdate}
+        />
+      )}
+
+      {showDeleteConfirm && (
+        <DeleteConfirmationDialog
+          onConfirm={handleDelete}
+          onCancel={() => setShowDeleteConfirm(false)}
+        />
+      )}
     </div>
   );
 };
