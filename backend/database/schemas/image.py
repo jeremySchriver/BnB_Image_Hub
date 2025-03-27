@@ -10,8 +10,11 @@ class ImageCreate(BaseModel):
     search_preview_path: Optional[str] = None
     tag_preview_path: Optional[str] = None
     untagged_full_path: Optional[str] = None
-    tag_ids: Optional[List[str]] = []
-    author_id: Optional[int] = None
+    tags: Optional[List[str]] = []
+    author: Optional[str] = None
+
+    class Config:
+        from_attributes = True
 
 class ImageResponse(BaseModel):
     id: int

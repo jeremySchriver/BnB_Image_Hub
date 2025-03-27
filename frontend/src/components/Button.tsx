@@ -1,9 +1,10 @@
 
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { cva } from 'class-variance-authority';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'link';
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'link' | "destructive";
   size?: 'sm' | 'md' | 'lg';
   isLoading?: boolean;
   icon?: React.ReactNode;
@@ -27,7 +28,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80 focus:ring-secondary/30',
       outline: 'border border-input bg-transparent hover:bg-secondary/50 focus:ring-secondary',
       ghost: 'hover:bg-secondary focus:ring-secondary',
-      link: 'text-primary underline-offset-4 hover:underline'
+      link: 'text-primary underline-offset-4 hover:underline',
+      destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
     };
 
     const sizeClasses = {
