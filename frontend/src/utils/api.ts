@@ -19,6 +19,10 @@ export interface ImageMetadata {
   tags: string[];
   date_added: string;
   author: string;
+  file_size: number;
+  file_type: string;
+  width: number;
+  height: number;
 }
 
 export interface UpdateImageTagsData {

@@ -18,6 +18,8 @@ import string
 from datetime import datetime
 from pathlib import Path
 import logging
+from PIL import Image as PILImage
+import mimetypes
 
 logger = logging.getLogger(__name__)
 
@@ -221,7 +223,18 @@ def create_image(db: Session, image_data: ImageCreate):
             search_preview_path=image_data.search_preview_path,
             tag_preview_path=image_data.tag_preview_path,
             untagged_full_path=image_data.untagged_full_path,
+            file_size=None,
+            file_type=None,
+            width=None,
+            height=None
         )
+        
+        file_details = get_image_details(image_data.untagged_full_path)
+        if file_details:
+            image.file_size = file_details.get("file_size")
+            image.file_type = file_details.get("file_type")
+            image.width = file_details.get("width")
+            image.height = file_details.get("height")
         
         if image_data.author:
             # Handle author if provided
@@ -264,6 +277,29 @@ def get_image(db: Session, image_id: int):
 def list_images(db: Session, skip: int = 0, limit: int = 100):
     return db.query(Image).offset(skip).limit(limit).all()
 
+def get_image_details(file_path: str) -> dict:
+    """Get detailed file information for an image."""
+    try:
+        # Get file size
+        file_size = os.path.getsize(file_path)
+        
+        # Get file type
+        file_type = mimetypes.guess_type(file_path)[0]
+        
+        # Get image dimensions
+        with PILImage.open(file_path) as img:
+            width, height = img.size
+            
+        return {
+            "file_size": file_size,
+            "file_type": file_type,
+            "width": width,
+            "height": height
+        }
+    except Exception as e:
+        logger.error(f"Error getting image details: {str(e)}")
+        return {}
+
 def get_next_untagged_image(db: Session):
     """Get the next untagged image that hasn't been processed yet."""
     return (
@@ -302,12 +338,12 @@ def get_images_by_tags(db: Session, tags: List[str], skip: int = 0, limit: int =
     return query.offset(skip).limit(limit).all()
 
 '''Deletion methods'''
-def delete_image(db: Session, image_id: int):
+'''def delete_image(db: Session, image_id: int):
     image = db.query(Image).filter(Image.id == image_id).first()
     if image:
         db.delete(image)
         db.commit()
-    return image
+    return image'''
 
 '''Seed constant data into the database'''    
 def cast_constant_to_db(db: Session, image_data: ImageCreate) -> Image:
