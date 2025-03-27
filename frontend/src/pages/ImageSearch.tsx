@@ -7,7 +7,7 @@ import Navbar from '@/components/Navbar';
 import ImageCard from '@/components/ImageCard';
 import TagInput from '@/components/TagInput';
 import AuthorInput from '@/components/AuthorInput';
-import { cn } from '@/lib/utils';
+import { formatFileSize } from '@/lib/utils';
 import { 
   searchImages, 
   getPreviewUrl, 
@@ -360,6 +360,51 @@ const ImageSearch = () => {
                           ) : (
                             <p className="mt-1 text-sm text-muted-foreground">No tags</p>
                           )}
+                        </div>
+
+                        {/* File Information */}
+                        <div>
+                          <h4 className="text-s font-semibold mb-2">File Information</h4>
+                          <div className="space-y-1.5 text-xs">
+                            <div className="flex justify-between items-center">
+                              <span className="text-muted-foreground">Filename:</span>
+                              <span className="font-xs truncate ml-2 text-right max-w-[180px]">
+                                {selectedImage.filename}
+                              </span>
+                            </div>
+                            
+                            <div className="flex justify-between items-center">
+                              <span className="text-muted-foreground">Date Added:</span>
+                              <span className="font-xs">
+                                {new Date(selectedImage.date_added).toLocaleDateString('en-US', {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric'
+                                })}
+                              </span>
+                            </div>
+                            
+                            <div className="flex justify-between items-center">
+                              <span className="text-muted-foreground">File Size</span>
+                              <span className="font-xs truncate ml-2 text-right max-w-[180px]">
+                                {formatFileSize(selectedImage.file_size)}
+                              </span>
+                            </div>
+
+                            <div className="flex justify-between items-center">
+                              <span className="text-muted-foreground">File Type:</span>
+                              <span className="font-xs truncate ml-2 text-right max-w-[180px]">
+                                {selectedImage.file_type}
+                              </span>
+                            </div>
+
+                            <div className="flex justify-between items-center">
+                              <span className="text-muted-foreground">Dimensions:</span>
+                              <span className="font-xs truncate ml-2 text-right max-w-[180px]">
+                                {selectedImage.width} × {selectedImage.height}
+                              </span>
+                            </div>
+                          </div>
                         </div>
                       </>
                     ) : (

@@ -12,6 +12,10 @@ class ImageCreate(BaseModel):
     untagged_full_path: Optional[str] = None
     tags: Optional[List[str]] = []
     author: Optional[str] = None
+    file_size: Optional[int] = None
+    file_type: Optional[str] = None
+    width: Optional[int] = None
+    height: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -26,6 +30,10 @@ class ImageResponse(BaseModel):
     tags: List[TagResponse]
     date_added: datetime
     author: Optional[AuthorResponse] = None
+    file_size: Optional[int] = None
+    file_type: Optional[str] = None
+    width: Optional[int] = None
+    height: Optional[int] = None
 
     class Config:
         from_attributes = True

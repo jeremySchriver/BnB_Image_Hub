@@ -16,6 +16,10 @@ export interface Image {
   url: string;
   author?: string;
   tags: string[];
+  file_size: number,
+  file_type: string,
+  width: number,
+  height: number
 }
 
 export interface ImageUploadProgress {

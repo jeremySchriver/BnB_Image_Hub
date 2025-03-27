@@ -214,7 +214,11 @@ def get_image_by_id(
             untagged_full_path=image.untagged_full_path,
             tags=tag_responses,
             date_added=image.date_added,
-            author=image.author
+            author=image.author,
+            file_size = image.file_size,
+            file_type = image.file_type,
+            width = image.width,
+            height = image.height,
         )
         
         return response
@@ -245,7 +249,11 @@ def get_all_images(db: Session = Depends(get_db)):
                 "untagged_thumb_path": image.untagged_thumb_path,
                 "tags": [tag.name for tag in image.tags],
                 "date_added": image.date_added.isoformat() if image.date_added else None,
-                "author": image.author.name if image.author else None
+                "author": image.author.name if image.author else None,
+                "file_size": image.file_size,
+                "file_type": image.file_type,
+                "width": image.width,
+                "height": image.height,
             }
             response.append(image_data)
             
@@ -293,7 +301,11 @@ def search_images(
                 "untagged_full_path": image.untagged_full_path,
                 "tags": [tag.name for tag in image.tags],
                 "date_added": image.date_added.isoformat() if image.date_added else None,
-                "author": image.author.name if image.author else None
+                "author": image.author.name if image.author else None,
+                "file_size": image.file_size,
+                "file_type": image.file_type,
+                "width": image.width,
+                "height": image.height,
             })
             
         return response
