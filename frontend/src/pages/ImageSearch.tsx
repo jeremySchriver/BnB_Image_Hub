@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search as SearchIcon, Tag, Filter, X, HelpCircle, User, Download } from 'lucide-react';
+import { Search as SearchIcon, Tag, Filter, X, HelpCircle, User, Download, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import TransitionWrapper from '@/components/TransitionWrapper';
 import Button from '@/components/Button';
@@ -13,7 +13,8 @@ import {
   getPreviewUrl, 
   getActualImage, 
   updateImageMetadata, 
-  updateImageTags 
+  updateImageTags,
+  deleteImage 
 } from '@/utils/api';
 import type { ImageMetadata } from '@/utils/api';
 
@@ -35,6 +36,9 @@ const ImageSearch = () => {
   // Filter states
   const [filterTags, setFilterTags] = useState<string[]>([]);
   const [filterAuthor, setFilterAuthor] = useState('');
+
+  // Delete confirmation state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // ===============================
   // Effects
@@ -155,6 +159,26 @@ const ImageSearch = () => {
     } catch (error) {
       console.error('Failed to update image:', error);
       toast.error('Failed to save changes');
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!selectedImage) return;
+    
+    try {
+      await deleteImage(selectedImage.id);
+      
+      // Remove image from state
+      setImages(prev => prev.filter(img => img.id !== selectedImage.id));
+      
+      // Close modal and confirmation
+      setShowDeleteConfirm(false);
+      setSelectedImage(null);
+      
+      toast.success('Image deleted successfully');
+    } catch (error) {
+      console.error('Failed to delete image:', error);
+      toast.error('Failed to delete image');
     }
   };
 
@@ -388,19 +412,55 @@ const ImageSearch = () => {
               {/* Modal Footer */}
               <div className="p-4 border-t border-border flex justify-end gap-2">
                 {!isEditing && (
-                  <Button
-                    variant="outline"
-                    onClick={() => handleDownload(selectedImage.id)}
-                    className="flex items-center gap-2"
-                  >
-                    <Download className="h-4 w-4" />
-                    Download
-                  </Button>
+                  <>
+                    <Button
+                      variant="outline"
+                      onClick={() => handleDownload(selectedImage.id)}
+                      className="flex items-center gap-2"
+                    >
+                      <Download className="h-4 w-4" />
+                      Download
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={() => setShowDeleteConfirm(true)}
+                      className="flex items-center gap-2"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Delete
+                    </Button>
+                  </>
                 )}
                 <Button variant="outline" onClick={closeModal}>
                   Close
                 </Button>
               </div>
+
+              {/* Delete Confirmation Dialog */}
+              {showDeleteConfirm && (
+                <div className="fixed inset-0 z-[60] bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
+                  <div className="bg-card border border-border rounded-lg shadow-elevation p-6 max-w-md w-full animate-fade-in">
+                    <h3 className="text-lg font-medium mb-2">Delete Image</h3>
+                    <p className="text-muted-foreground mb-4">
+                      Are you sure you want to delete this image? This action cannot be undone.
+                    </p>
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowDeleteConfirm(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        onClick={handleDelete}
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

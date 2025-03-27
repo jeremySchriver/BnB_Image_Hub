@@ -247,3 +247,20 @@ export const updateImageMetadata = async (
 
   return response.json();
 };
+
+export const deleteImage = async (imageId: string | number): Promise<void> => {
+  const url = `${BASE_URL}/images/images/${imageId}`;
+  console.log('Delete URL:', url); // Add this line to debug
+  
+  const response = await fetch(url, {
+    method: 'DELETE',
+    headers: {
+      ...authHeader()
+    }
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to delete image: ${error}`);
+  }
+};

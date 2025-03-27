@@ -323,3 +323,10 @@ def cast_constant_to_db(db: Session, image_data: ImageCreate) -> Image:
     db.commit()
     db.refresh(db_image)
     return db_image
+
+def delete_image(db: Session, image_id: int) -> None:
+    """Delete an image from the database."""
+    image = get_image(db, image_id)
+    if image:
+        db.delete(image)
+        db.commit()

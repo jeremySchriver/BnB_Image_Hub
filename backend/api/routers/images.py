@@ -12,7 +12,7 @@ from backend.database.schemas.image import ImageResponse, ImageUpdate, ImageCrea
 from backend.database.schemas.tag import TagResponse
 from backend.database.models.tag import Tag
 from backend.database.models.author import Author
-from backend.database.services.image_service import get_image, get_all_untagged_images, get_next_untagged_image, update_image_tags, update_image_metadata, _generate_hash_filename, create_image
+from backend.database.services.image_service import get_image, get_all_untagged_images, get_next_untagged_image, update_image_tags, update_image_metadata, _generate_hash_filename, create_image, delete_image
 from backend.config import TAG_PREVIEW_DIR, SEARCH_PREVIEW_DIR, UNTAGGED_DIR
 from backend.processor.thumbnail_generator import generate_previews
 
@@ -431,4 +431,39 @@ async def upload_batch_images(
         raise HTTPException(
             status_code=500,
             detail=f"Upload failed: {str(e)}"
+        )
+        
+@router.delete("/images/{image_id}")
+async def delete_image_endpoint(image_id: int, db: Session = Depends(get_db)):
+    """Delete an image and all its associated files."""
+    image = get_image(db, image_id)
+    if not image:
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    # List of paths to delete
+    paths_to_delete = [
+        image.untagged_full_path,
+        image.tag_preview_path,
+        image.search_preview_path
+    ]
+
+    # Delete all image files
+    for path in paths_to_delete:
+        if path and os.path.exists(path):
+            try:
+                os.remove(path)
+            except Exception as e:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to delete file {path}: {str(e)}"
+                )
+
+    # Delete database record
+    try:
+        delete_image(db, image_id)
+        return {"message": "Image deleted successfully"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to delete image record: {str(e)}"
         )
