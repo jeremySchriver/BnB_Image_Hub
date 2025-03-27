@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Upload, Tag, Search, LogOut } from 'lucide-react';
+import { Upload, Tag, Search, LogOut, UserRoundMinus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const Navbar = () => {
@@ -45,6 +45,12 @@ const Navbar = () => {
             icon={<Search className="h-5 w-5" />} 
             label="Search" 
             isActive={isActive('/search')} 
+          />
+          <NavItem 
+            to="/authors" 
+            icon={<UserRoundMinus className="h-5 w-5" />} 
+            label="Authors" 
+            isActive={isActive('/authors')} 
           />
         </div>
         

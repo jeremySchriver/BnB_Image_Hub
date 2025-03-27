@@ -9,6 +9,7 @@ import Login from "./pages/Login";
 import ImageUpload from "./pages/ImageUpload";
 import ImageTagging from "./pages/ImageTagging";
 import ImageSearch from "./pages/ImageSearch";
+import AuthorManagement from "./pages/AuthorManagement";
 import NotFound from "./pages/NotFound";
 import { isAuthenticated } from "./utils/api";
 
@@ -71,6 +72,14 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <ImageSearch />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/authors" 
+            element={
+              <ProtectedRoute>
+                <AuthorManagement />
               </ProtectedRoute>
             } 
           />

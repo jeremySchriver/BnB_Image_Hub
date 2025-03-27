@@ -268,3 +268,66 @@ export const deleteImage = async (imageId: string | number): Promise<void> => {
     throw new Error(`Failed to delete image: ${error}`);
   }
 };
+
+export const getAuthorsData = async (): Promise<Author[]> => {
+  const response = await fetch(`${BASE_URL}/authors/`);
+  return response.json();
+};
+
+export const getAuthorById = async (author_id: number): Promise<Author> => {
+  const response = await fetch(`${BASE_URL}/authors/${author_id}`);
+  return response.json();
+};
+
+export const updateAuthorData = async (
+  author_id: number,
+  updateData: Author
+): Promise<Author> => {
+  const response = await fetch(`${BASE_URL}/authors/${author_id}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeader()
+    },
+    body: JSON.stringify(updateData)
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.detail || 'Failed to update image metadata');
+  }
+
+  return response.json();
+};
+
+export const deleteAuthorData = async (author_id: number): Promise<void> => {
+  const response = await fetch(`${BASE_URL}/authors/${author_id}`, {
+    method: 'DELETE',
+    headers: {
+      ...authHeader()
+    }
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to delete author: ${error}`);
+  }
+};
+
+export const createAuthor = async (author: Author): Promise<Author> => {
+  const response = await fetch(`${BASE_URL}/authors/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeader()
+    },
+    body: JSON.stringify(author)
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.detail || 'Failed to create author');
+  }
+
+  return response.json();
+}
