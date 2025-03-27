@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Upload, Tag, Search, LogOut, UserRoundMinus } from 'lucide-react';
+import { Upload, Tag, Search, LogOut, UserRoundMinus, UserRoundCog } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const Navbar = () => {
@@ -51,6 +51,12 @@ const Navbar = () => {
             icon={<UserRoundMinus className="h-5 w-5" />} 
             label="Authors" 
             isActive={isActive('/authors')} 
+          />
+          <NavItem 
+            to="/account" 
+            icon={<UserRoundCog className="h-5 w-5" />} 
+            label="My Account" 
+            isActive={isActive('/account')} 
           />
         </div>
         

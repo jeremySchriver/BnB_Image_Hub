@@ -43,6 +43,16 @@ interface SearchFilters {
   author?: string;
 }
 
+export interface User {
+  id: number;
+  email: string;
+  username: string;
+  is_active: boolean;
+  is_superuser: boolean;
+  date_joined: string;
+  last_login?: string;
+}
+
 export const searchImages = async (filters: SearchFilters): Promise<ImageMetadata[]> => {
   const params = new URLSearchParams();
   
@@ -90,6 +100,34 @@ export const login = async (email: string, password: string): Promise<LoginRespo
     })
   });
   
+  return handleResponse(response);
+};
+
+// Get current user profile
+export const getCurrentUser = async (): Promise<User> => {
+  const response = await fetch(`${BASE_URL}/users/me`, {
+    headers: {
+      ...authHeader()
+    }
+  });
+  return handleResponse(response);
+};
+
+// Update user profile
+export const updateUserProfile = async (userData: {
+  email?: string;
+  username?: string;
+  password?: string;
+  currentPassword?: string;
+}): Promise<User> => {
+  const response = await fetch(`${BASE_URL}/users/me`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeader()
+    },
+    body: JSON.stringify(userData)
+  });
   return handleResponse(response);
 };
 

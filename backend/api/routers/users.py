@@ -3,14 +3,17 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from backend.database.database import get_db
+from backend.database.models.user import User
 from backend.database.schemas.user import UserCreate, UserResponse, UserUpdate
 from backend.database.services.user_service import (
     create_user,
     get_user_by_id,
     get_user_by_username,
     get_user_by_email,
-    update_user
+    update_user,
+    get_current_user
 )
+from backend.api.auth import get_current_user
 
 router = APIRouter(
     prefix="/users",
@@ -54,3 +57,15 @@ def update_user_info(
     db: Session = Depends(get_db)
 ):
     return update_user(db=db, user_id=user_id, user_data=user_data)
+
+@router.get("/me", response_model=UserResponse)
+def read_current_user(current_user: User = Depends(get_current_user)):
+    return current_user
+
+@router.put("/me", response_model=UserResponse)
+def update_current_user(
+    user_data: UserUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    return update_user(db=db, user_id=current_user.id, user_data=user_data)

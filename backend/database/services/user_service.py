@@ -27,8 +27,7 @@ def create_user(db: Session, user_data: UserCreate) -> User:
         email=user_data.email,
         username=user_data.username,
         hashed_password=hashed_password,
-        is_active=True,
-        is_superuser=False
+        is_active=True
     )
     db.add(db_user)
     db.commit()
@@ -87,3 +86,6 @@ def remove_super_user(db: Session, email: str) -> User:
     db.commit()
     db.refresh(user)
     return user
+
+def get_current_user(db: Session, user_id: int) -> User:
+    return get_user_by_id(db, user_id)
