@@ -132,20 +132,20 @@ export const updateUserProfile = async (userData: {
     const response = await fetch(`${BASE_URL}/users/me`, {
       method: 'PUT',
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        ...authHeader()
       },
       body: JSON.stringify(userData)
     });
 
-    const data = await response.json();
-
     if (!response.ok) {
-      const errorMessage = data.detail || 'Failed to update profile';
-      throw new Error(typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage));
+      const errorData = await response.json();
+      console.error('Update profile error details:', errorData);
+      throw new Error(errorData.detail || 'Failed to update profile');
     }
 
-    return data;
+    const updatedUser = await response.json();
+    return updatedUser;
   } catch (error) {
     console.error('Update profile error:', error);
     throw error;
@@ -159,9 +159,17 @@ export const getToken = (): string | null => {
 
 // Check if user is authenticated
 export const isAuthenticated = (): boolean => {
-  const token = getToken();
-  // Also check for our demo token
-  return !!token || token === 'demo_token_for_preview_only';
+  const token = localStorage.getItem('auth_token');
+  return !!token; // Returns true if token exists, false otherwise
+};
+
+export const logout = (): void => {
+  localStorage.removeItem('auth_token');
+  window.location.href = '/login';
+};
+
+export const getAuthToken = (): string | null => {
+  return localStorage.getItem('auth_token');
 };
 
 // Add auth header to requests
@@ -176,11 +184,6 @@ export const authHeader = () => {
   return {
     'Content-Type': 'application/json'
   };
-};
-
-// Check if we're in demo mode
-export const isDemoMode = (): boolean => {
-  return getToken() === 'demo_token_for_preview_only';
 };
 
 // Image upload functions
@@ -399,23 +402,41 @@ export const createAuthor = async (author: Author): Promise<Author> => {
   return response.json();
 }
 
-export const login = async (email: string, password: string): Promise<LoginResponse> => {
-  const response = await fetch(`${BASE_URL}/auth/token`, { // Changed from /auth/login to /auth/token
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: new URLSearchParams({
-      'username': email,
-      'password': password,
-    })
-  });
-  
-  const data = await handleResponse(response);
-  if (data.access_token) {
-    localStorage.setItem('auth_token', data.access_token);
+const handleApiError = (error: any) => {
+  if (error.response?.status === 401) {
+    // Unauthorized - clear token and redirect to login
+    logout();
+    throw new Error('Session expired. Please sign in again.');
   }
-  return data;
+  throw error;
+};
+
+export const login = async (email: string, password: string): Promise<LoginResponse> => {
+  try {
+    const response = await fetch(`${BASE_URL}/auth/token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: new URLSearchParams({
+        username: email, // FastAPI OAuth2 expects 'username' even for email
+        password: password,
+        grant_type: 'password'
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Login failed');
+    }
+
+    return response.json();
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new Error(error.message);
+    }
+    throw new Error('Login failed. Please check your credentials.');
+  }
 };
 
 export const testAuth = async (): Promise<any> => {
