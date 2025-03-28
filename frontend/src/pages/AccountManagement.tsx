@@ -32,14 +32,35 @@ const AccountManagement = () => {
   const fetchUserData = async () => {
     setIsLoading(true);
     try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+  
       const userData = await getCurrentUser();
+      console.log('User data received:', userData);
+      
       setFormData(prev => ({
         ...prev,
-        email: userData.email,
-        username: userData.username
+        email: userData.email || '',
+        username: userData.username || '',
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
       }));
     } catch (error) {
-      toast.error("Failed to fetch user data");
+      console.error('Error fetching user data:', error);
+      
+      // Handle specific error cases
+      if (error instanceof Error) {
+        if (error.message.includes('authentication') || error.message.includes('401')) {
+          toast.error("Session expired. Please login again.");
+          localStorage.removeItem('auth_token');
+          window.location.href = '/login';
+        } else {
+          toast.error(error.message || "Failed to load account data");
+        }
+      }
     } finally {
       setIsLoading(false);
     }

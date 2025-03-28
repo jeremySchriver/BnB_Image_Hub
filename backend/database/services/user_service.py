@@ -6,6 +6,8 @@ from ..schemas.user import UserCreate, UserUpdate
 from datetime import datetime
 import bcrypt
 
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
 def get_password_hash(password: str) -> str:
     # Convert the password string to bytes
     password_bytes = password.encode('utf-8')
@@ -19,7 +21,10 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     # Convert passwords to bytes for comparison
     plain_password_bytes = plain_password.encode('utf-8')
     hashed_password_bytes = hashed_password.encode('utf-8')
-    return bcrypt.checkpw(plain_password_bytes, hashed_password_bytes)
+    try:
+        return bcrypt.checkpw(plain_password_bytes, hashed_password_bytes)
+    except ValueError:
+        return False
 
 def create_user(db: Session, user_data: UserCreate) -> User:
     hashed_password = get_password_hash(user_data.password)
@@ -34,10 +39,13 @@ def create_user(db: Session, user_data: UserCreate) -> User:
     db.refresh(db_user)
     return db_user
 
-def authenticate_user(db: Session, username: str, password: str) -> User:
-    user = get_user_by_username(db, username)
-    if not user or not verify_password(password, user.hashed_password):
+def authenticate_user(db: Session, email: str, password: str) -> User:
+    user = get_user_by_email(db, email)
+    if not user:
         return None
+    if not verify_password(password, user.hashed_password):
+        return None
+    
     user.last_login = datetime.utcnow()
     db.commit()
     return user
@@ -55,14 +63,14 @@ def update_user(db: Session, user_id: int, user_data: UserUpdate) -> User:
     user = get_user_by_id(db, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     for field, value in user_data.dict(exclude_unset=True).items():
-        if field == "password":
+        if field == "password" and value:
             value = get_password_hash(value)
             setattr(user, "hashed_password", value)
         else:
             setattr(user, field, value)
-    
+
     db.commit()
     db.refresh(user)
     return user

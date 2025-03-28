@@ -87,30 +87,38 @@ const handleResponse = async (response: Response) => {
   return response.json();
 };
 
-// Authentication functions
-export const login = async (email: string, password: string): Promise<LoginResponse> => {
-  const response = await fetch(`${BASE_URL}/token`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded'
-    },
-    body: new URLSearchParams({
-      username: email, // FastAPI uses username field for the identifier
-      password
-    })
-  });
-  
-  return handleResponse(response);
-};
-
 // Get current user profile
 export const getCurrentUser = async (): Promise<User> => {
-  const response = await fetch(`${BASE_URL}/users/me`, {
-    headers: {
-      ...authHeader()
+  const token = localStorage.getItem('auth_token');
+  if (!token) {
+    throw new Error('No authentication token found');
+  }
+
+  try {
+    const response = await fetch(`${BASE_URL}/auth/me`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      if (response.status === 401) {
+        // Clear token and redirect to login if unauthorized
+        localStorage.removeItem('auth_token');
+        window.location.href = '/login';
+        throw new Error('Session expired. Please login again.');
+      }
+      throw new Error(errorData.detail || `Failed to fetch user data (${response.status})`);
     }
-  });
-  return handleResponse(response);
+
+    return await response.json();
+  } catch (error) {
+    console.error('getCurrentUser error:', error);
+    throw error;
+  }
 };
 
 // Update user profile
@@ -144,9 +152,17 @@ export const isAuthenticated = (): boolean => {
 };
 
 // Add auth header to requests
-const authHeader = () => {
-  const token = getToken();
-  return token ? { 'Authorization': `Bearer ${token}` } : {};
+export const authHeader = () => {
+  const token = localStorage.getItem('auth_token');
+  if (token) {
+    return {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    };
+  }
+  return {
+    'Content-Type': 'application/json'
+  };
 };
 
 // Check if we're in demo mode
@@ -369,3 +385,41 @@ export const createAuthor = async (author: Author): Promise<Author> => {
 
   return response.json();
 }
+
+export const login = async (email: string, password: string): Promise<LoginResponse> => {
+  const response = await fetch(`${BASE_URL}/auth/token`, { // Changed from /auth/login to /auth/token
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({
+      'username': email,
+      'password': password,
+    })
+  });
+  
+  const data = await handleResponse(response);
+  if (data.access_token) {
+    localStorage.setItem('auth_token', data.access_token);
+  }
+  return data;
+};
+
+export const testAuth = async (): Promise<any> => {
+  const response = await fetch(`${BASE_URL}/auth/test-token`, {
+    headers: {
+      ...authHeader()
+    }
+  });
+  return handleResponse(response);
+};
+
+// Helper to inspect the token
+export const debugToken = () => {
+  const token = localStorage.getItem('auth_token');
+  console.log('Stored token:', token);
+  if (token) {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    console.log('Token payload:', payload);
+  }
+};
