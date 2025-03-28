@@ -15,8 +15,12 @@ class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     username: Optional[str] = None
     password: Optional[str] = None
+    currentPassword: Optional[str] = None
     is_active: Optional[bool] = None
     is_superuser: Optional[bool] = None
+    
+    class Config:
+        from_attributes = True
 
 class UserResponse(UserBase):
     id: int

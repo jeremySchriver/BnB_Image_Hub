@@ -59,21 +59,29 @@ def get_user_by_username(db: Session, username: str) -> User:
 def get_user_by_email(db: Session, email: str) -> User:
     return db.query(User).filter(User.email == email).first()
 
-def update_user(db: Session, user_id: int, user_data: UserUpdate) -> User:
-    user = get_user_by_id(db, user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+def update_user(db: Session, user_id: int, update_data: dict) -> User:
+    try:
+        user = get_user_by_id(db, user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
 
-    for field, value in user_data.dict(exclude_unset=True).items():
-        if field == "password" and value:
-            value = get_password_hash(value)
-            setattr(user, "hashed_password", value)
-        else:
-            setattr(user, field, value)
+        # Handle password update
+        if 'password' in update_data:
+            user.hashed_password = get_password_hash(update_data['password'])
+            del update_data['password']
 
-    db.commit()
-    db.refresh(user)
-    return user
+        # Update other fields
+        for field, value in update_data.items():
+            if hasattr(user, field) and value is not None:
+                setattr(user, field, value)
+
+        db.commit()
+        db.refresh(user)
+        return user
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
 
 def add_super_user(db: Session, email: str) -> User:
     user = get_user_by_email(db, email)

@@ -128,15 +128,28 @@ export const updateUserProfile = async (userData: {
   password?: string;
   currentPassword?: string;
 }): Promise<User> => {
-  const response = await fetch(`${BASE_URL}/users/me`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      ...authHeader()
-    },
-    body: JSON.stringify(userData)
-  });
-  return handleResponse(response);
+  try {
+    const response = await fetch(`${BASE_URL}/users/me`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(userData)
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      const errorMessage = data.detail || 'Failed to update profile';
+      throw new Error(typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage));
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Update profile error:', error);
+    throw error;
+  }
 };
 
 // Get the authentication token

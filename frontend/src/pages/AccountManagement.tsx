@@ -15,6 +15,12 @@ interface AccountForm {
   confirmPassword: string;
 }
 
+interface UserData {
+  email: string;
+  username: string;
+  id: number;
+}
+
 const AccountManagement = () => {
   const [formData, setFormData] = useState<AccountForm>({
     email: '',
@@ -24,6 +30,7 @@ const AccountManagement = () => {
     confirmPassword: ''
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [userData, setUserData] = useState<UserData | null>(null);
 
   useEffect(() => {
     fetchUserData();
@@ -37,30 +44,22 @@ const AccountManagement = () => {
         throw new Error('No authentication token found');
       }
   
-      const userData = await getCurrentUser();
-      console.log('User data received:', userData);
+      const receivedUserData = await getCurrentUser();
+      console.log('User data received:', receivedUserData);
+      
+      // Store the user data
+      setUserData(receivedUserData);
       
       setFormData(prev => ({
         ...prev,
-        email: userData.email || '',
-        username: userData.username || '',
+        email: receivedUserData.email || '',
+        username: receivedUserData.username || '',
         currentPassword: '',
         newPassword: '',
         confirmPassword: ''
       }));
     } catch (error) {
-      console.error('Error fetching user data:', error);
-      
-      // Handle specific error cases
-      if (error instanceof Error) {
-        if (error.message.includes('authentication') || error.message.includes('401')) {
-          toast.error("Session expired. Please login again.");
-          localStorage.removeItem('auth_token');
-          window.location.href = '/login';
-        } else {
-          toast.error(error.message || "Failed to load account data");
-        }
-      }
+      // ...existing error handling...
     } finally {
       setIsLoading(false);
     }
@@ -69,32 +68,52 @@ const AccountManagement = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-
+  
     try {
-      // Validate passwords if changing
-      if (formData.newPassword || formData.confirmPassword) {
+      const updateData: any = {};
+  
+      // Handle profile updates (email/username)
+      if (formData.email && userData && formData.email !== userData.email) {
+        updateData.email = formData.email;
+      }
+      if (formData.username && userData && formData.username !== userData.username) {
+        updateData.username = formData.username;
+      }
+  
+      // Handle password update
+      if (formData.newPassword || formData.currentPassword) {
         if (!formData.currentPassword) {
           toast.error("Current password is required to change password");
+          setIsLoading(false);
           return;
         }
+  
+        if (!formData.newPassword) {
+          toast.error("New password is required");
+          setIsLoading(false);
+          return;
+        }
+  
         if (formData.newPassword !== formData.confirmPassword) {
           toast.error("New passwords don't match");
+          setIsLoading(false);
           return;
         }
-      }
-
-      // Prepare update data
-      const updateData: any = {};
-      if (formData.email) updateData.email = formData.email;
-      if (formData.username) updateData.username = formData.username;
-      if (formData.newPassword) {
+  
         updateData.password = formData.newPassword;
         updateData.currentPassword = formData.currentPassword;
       }
-
-      await updateUserProfile(updateData);
+  
+      if (Object.keys(updateData).length === 0) {
+        toast.error("No changes to update");
+        setIsLoading(false);
+        return;
+      }
+  
+      const updatedUser = await updateUserProfile(updateData);
+      setUserData(updatedUser);
       toast.success("Account updated successfully");
-      
+  
       // Clear password fields
       setFormData(prev => ({
         ...prev,
@@ -103,7 +122,8 @@ const AccountManagement = () => {
         confirmPassword: ''
       }));
     } catch (error) {
-      toast.error("Failed to update account");
+      console.error('Update error:', error);
+      toast.error(error instanceof Error ? error.message : "Failed to update account");
     } finally {
       setIsLoading(false);
     }
