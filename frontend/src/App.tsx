@@ -10,6 +10,7 @@ import ImageUpload from "./pages/ImageUpload";
 import ImageTagging from "./pages/ImageTagging";
 import ImageSearch from "./pages/ImageSearch";
 import AuthorManagement from "./pages/AuthorManagement";
+import AccountManagement from "./pages/AccountManagement";
 import NotFound from "./pages/NotFound";
 import { isAuthenticated } from "./utils/api";
 
@@ -80,6 +81,14 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <AuthorManagement />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/account" 
+            element={
+              <ProtectedRoute>
+                <AccountManagement />
               </ProtectedRoute>
             } 
           />
