@@ -123,7 +123,6 @@ export const getCurrentUser = async (): Promise<User> => {
 
     return await response.json();
   } catch (error) {
-    console.error('getCurrentUser error:', error);
     throw error;
   }
 };
@@ -147,25 +146,14 @@ export const updateUserProfile = async (userData: {
 
     if (!response.ok) {
       const errorData = await response.json();
-      console.error('Update profile error details:', errorData);
       throw new Error(errorData.detail || 'Failed to update profile');
     }
 
     const updatedUser = await response.json();
     return updatedUser;
   } catch (error) {
-    console.error('Update profile error:', error);
     throw error;
   }
-};
-
-export const testAuth = async (): Promise<any> => {
-  const response = await fetch(`${BASE_URL}/auth/test-token`, {
-    headers: {
-      ...authHeader()
-    }
-  });
-  return handleResponse(response);
 };
 
 // =============================================================================
@@ -199,16 +187,6 @@ export const authHeader = () => {
   return {
     'Content-Type': 'application/json'
   };
-};
-
-// Helper to inspect the token
-export const debugToken = () => {
-  const token = localStorage.getItem('auth_token');
-  console.log('Stored token:', token);
-  if (token) {
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    console.log('Token payload:', payload);
-  }
 };
 
 // =============================================================================
@@ -274,7 +252,6 @@ export const updateImageMetadata = async (
 
 export const deleteImage = async (imageId: string | number): Promise<void> => {
   const url = `${BASE_URL}/images/images/${imageId}`;
-  console.log('Delete URL:', url); // Add this line to debug
   
   const response = await fetch(url, {
     method: 'DELETE',

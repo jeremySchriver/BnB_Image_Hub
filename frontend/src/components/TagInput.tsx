@@ -36,7 +36,6 @@ const TagInput: React.FC<TagInputProps> = ({
           setSuggestions(filteredSuggestions);
           setShowSuggestions(filteredSuggestions.length > 0);
         } catch (error) {
-          console.error('Failed to fetch tag suggestions:', error);
           setSuggestions([]);
           setShowSuggestions(false);
         }

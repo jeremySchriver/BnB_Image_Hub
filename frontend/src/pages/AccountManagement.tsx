@@ -45,7 +45,6 @@ const AccountManagement = () => {
       }
   
       const receivedUserData = await getCurrentUser();
-      console.log('User data received:', receivedUserData);
       
       // Store the user data
       setUserData(receivedUserData);
@@ -122,7 +121,6 @@ const AccountManagement = () => {
         confirmPassword: ''
       }));
     } catch (error) {
-      console.error('Update error:', error);
       toast.error(error instanceof Error ? error.message : "Failed to update account");
     } finally {
       setIsLoading(false);

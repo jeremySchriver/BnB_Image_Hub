@@ -31,7 +31,6 @@ const Login = () => {
         throw new Error('Invalid response from server');
       }
     } catch (error) {
-      console.error('Login error:', error);
       toast.error(error instanceof Error ? error.message : 'Login failed. Please try again.');
     } finally {
       setIsLoading(false);
