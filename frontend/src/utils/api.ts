@@ -1,12 +1,26 @@
 
 // API Connection Layer - Connects to FAST API instance
 
-const BASE_URL = 'http://localhost:8000'; // Change this to the actual FAST API endpoint
+const BASE_URL = 'http://localhost:8000';
+
+// =============================================================================
+// Type Definitions
+// =============================================================================
 
 // Types for API responses
 export interface LoginResponse {
   access_token: string;
   token_type: string;
+}
+
+export interface User {
+  id: number;
+  email: string;
+  username: string;
+  is_active: boolean;
+  is_superuser: boolean;
+  date_joined: string;
+  last_login?: string;
 }
 
 export interface ImageMetadata {
@@ -43,48 +57,41 @@ interface SearchFilters {
   author?: string;
 }
 
-export interface User {
-  id: number;
-  email: string;
-  username: string;
-  is_active: boolean;
-  is_superuser: boolean;
-  date_joined: string;
-  last_login?: string;
-}
+// =============================================================================
+// Authentication & User Management
+// =============================================================================
 
-export const searchImages = async (filters: SearchFilters): Promise<ImageMetadata[]> => {
-  const params = new URLSearchParams();
-  
-  if (filters.tags && filters.tags.length > 0) {
-    params.append('tags', filters.tags.join(','));
-  }
-  
-  if (filters.author) {
-    params.append('author', filters.author);
-  }
-  
-  const response = await fetch(`${BASE_URL}/images/search?${params.toString()}`, {
-    headers: {
-      ...authHeader()
+export const login = async (email: string, password: string): Promise<LoginResponse> => {
+  try {
+    const response = await fetch(`${BASE_URL}/auth/token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: new URLSearchParams({
+        username: email, // FastAPI OAuth2 expects 'username' even for email
+        password: password,
+        grant_type: 'password'
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Login failed');
     }
-  });
 
-  if (!response.ok) {
-    throw new Error('Failed to search images');
+    return response.json();
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new Error(error.message);
+    }
+    throw new Error('Login failed. Please check your credentials.');
   }
-  
-  return response.json();
 };
 
-// Helper for handling HTTP errors
-const handleResponse = async (response: Response) => {
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || `API Error: ${response.status}`);
-  }
-  
-  return response.json();
+export const logout = (): void => {
+  localStorage.removeItem('auth_token');
+  window.location.href = '/login';
 };
 
 // Get current user profile
@@ -152,8 +159,25 @@ export const updateUserProfile = async (userData: {
   }
 };
 
+export const testAuth = async (): Promise<any> => {
+  const response = await fetch(`${BASE_URL}/auth/test-token`, {
+    headers: {
+      ...authHeader()
+    }
+  });
+  return handleResponse(response);
+};
+
+// =============================================================================
+// Authentication Helpers
+// =============================================================================
+
 // Get the authentication token
 export const getToken = (): string | null => {
+  return localStorage.getItem('auth_token');
+};
+
+export const getAuthToken = (): string | null => {
   return localStorage.getItem('auth_token');
 };
 
@@ -161,15 +185,6 @@ export const getToken = (): string | null => {
 export const isAuthenticated = (): boolean => {
   const token = localStorage.getItem('auth_token');
   return !!token; // Returns true if token exists, false otherwise
-};
-
-export const logout = (): void => {
-  localStorage.removeItem('auth_token');
-  window.location.href = '/login';
-};
-
-export const getAuthToken = (): string | null => {
-  return localStorage.getItem('auth_token');
 };
 
 // Add auth header to requests
@@ -185,6 +200,20 @@ export const authHeader = () => {
     'Content-Type': 'application/json'
   };
 };
+
+// Helper to inspect the token
+export const debugToken = () => {
+  const token = localStorage.getItem('auth_token');
+  console.log('Stored token:', token);
+  if (token) {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    console.log('Token payload:', payload);
+  }
+};
+
+// =============================================================================
+// Image Management
+// =============================================================================
 
 // Image upload functions
 export const uploadImages = async (files: File[]): Promise<{ 
@@ -212,85 +241,6 @@ export const uploadImages = async (files: File[]): Promise<{
   }
 
   return response.json();
-};
-
-// Get image URL
-export const getImageUrl = (imageId: string): string => {
-  return `${BASE_URL}/images/${imageId}/content`;
-};
-
-// Get untagged images
-export const getUntaggedImages = async (limit: number = 10): Promise<ImageMetadata[]> => {
-  const response = await fetch(`/images/untagged?limit=${limit}`);
-  if (!response.ok) {
-    throw new Error('Failed to fetch untagged images');
-  }
-  return response.json();
-};
-
-export const getNextUntaggedImage = async (): Promise<ImageMetadata[]> => {
-  const response = await fetch(`${BASE_URL}/images/untagged/next`);
-  if (!response.ok) {
-    throw new Error('Failed to fetch untagged images');
-  }
-  return response.json();
-};
-
-// Update image tags
-export const updateImageTags = async (
-  imageId: number,
-  updateData: UpdateImageTagsData
-): Promise<ImageMetadata> => {
-  const response = await fetch(`${BASE_URL}/images/tags/${imageId}`, {
-      method: 'PUT',
-      headers: {
-          'Content-Type': 'application/json',
-          ...authHeader()
-      },
-      body: JSON.stringify(updateData)
-  });
-
-  if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || 'Failed to update image tags');
-  }
-
-  return response.json();
-};
-
-// Get image URL
-export const getUntaggedImageUrl = (image: ImageMetadata): string => {
-  // Use the URL provided by the API
-  return `${BASE_URL}${image.untagged_full_path}`;
-};
-
-export const searchTags = async (query: string): Promise<string[]> => {
-  const response = await fetch(`${BASE_URL}/tags/search?query=${encodeURIComponent(query)}`);
-  if (!response.ok) {
-    throw new Error('Failed to fetch tag suggestions');
-  }
-  const tags = await response.json();
-  return tags.map((tag: { name: string }) => tag.name);
-};
-
-export const searchAuthors = async (query: string): Promise<Author[]> => {
-  const response = await fetch(`${BASE_URL}/authors/search?query=${encodeURIComponent(query)}`);
-  if (!response.ok) {
-    throw new Error('Failed to fetch author suggestions');
-  }
-  return response.json();
-};
-
-export const getUntaggedPreviewUrl = (imageId: string, maxSize: number = 800): string => {
-  return `${BASE_URL}/preview/untagged/preview/${imageId}?max_size=${maxSize}`;
-};
-
-export const getPreviewUrl = (imageId: string, size: 'preview' | 'search'): string => {
-  return `${BASE_URL}/images/preview/${size}/${imageId}`;
-};
-
-export const getActualImage = (imageId: string): string => {
-  return `${BASE_URL}/images/content/${imageId}`;
 };
 
 export const getImageById = async (imageId: number): Promise<ImageMetadata> => {
@@ -339,6 +289,113 @@ export const deleteImage = async (imageId: string | number): Promise<void> => {
   }
 };
 
+// =============================================================================
+// Image URLs & Previews
+// =============================================================================
+
+// Get image URL
+export const getImageUrl = (imageId: string): string => {
+  return `${BASE_URL}/images/${imageId}/content`;
+};
+
+// Get image URL
+export const getUntaggedImageUrl = (image: ImageMetadata): string => {
+  // Use the URL provided by the API
+  return `${BASE_URL}${image.untagged_full_path}`;
+};
+
+export const getUntaggedPreviewUrl = (imageId: string, maxSize: number = 800): string => {
+  return `${BASE_URL}/preview/untagged/preview/${imageId}?max_size=${maxSize}`;
+};
+
+export const getPreviewUrl = (imageId: string, size: 'preview' | 'search'): string => {
+  return `${BASE_URL}/images/preview/${size}/${imageId}`;
+};
+
+export const getActualImage = (imageId: string): string => {
+  return `${BASE_URL}/images/content/${imageId}`;
+};
+
+// =============================================================================
+// Image Tagging & Search
+// =============================================================================
+
+export const searchImages = async (filters: SearchFilters): Promise<ImageMetadata[]> => {
+  const params = new URLSearchParams();
+  
+  if (filters.tags && filters.tags.length > 0) {
+    params.append('tags', filters.tags.join(','));
+  }
+  
+  if (filters.author) {
+    params.append('author', filters.author);
+  }
+  
+  const response = await fetch(`${BASE_URL}/images/search?${params.toString()}`, {
+    headers: {
+      ...authHeader()
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to search images');
+  }
+  
+  return response.json();
+};
+
+// Get untagged images
+export const getUntaggedImages = async (limit: number = 10): Promise<ImageMetadata[]> => {
+  const response = await fetch(`/images/untagged?limit=${limit}`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch untagged images');
+  }
+  return response.json();
+};
+
+export const getNextUntaggedImage = async (): Promise<ImageMetadata[]> => {
+  const response = await fetch(`${BASE_URL}/images/untagged/next`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch untagged images');
+  }
+  return response.json();
+};
+
+// Update image tags
+export const updateImageTags = async (
+  imageId: number,
+  updateData: UpdateImageTagsData
+): Promise<ImageMetadata> => {
+  const response = await fetch(`${BASE_URL}/images/tags/${imageId}`, {
+      method: 'PUT',
+      headers: {
+          'Content-Type': 'application/json',
+          ...authHeader()
+      },
+      body: JSON.stringify(updateData)
+  });
+
+  if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Failed to update image tags');
+  }
+
+  return response.json();
+};
+
+export const searchTags = async (query: string): Promise<string[]> => {
+  const response = await fetch(`${BASE_URL}/tags/search?query=${encodeURIComponent(query)}`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch tag suggestions');
+  }
+  const tags = await response.json();
+  return tags.map((tag: { name: string }) => tag.name);
+};
+
+// =============================================================================
+// Author Management
+// =============================================================================
+
 export const getAuthorsData = async (): Promise<Author[]> => {
   const response = await fetch(`${BASE_URL}/authors/`);
   return response.json();
@@ -346,6 +403,14 @@ export const getAuthorsData = async (): Promise<Author[]> => {
 
 export const getAuthorById = async (author_id: number): Promise<Author> => {
   const response = await fetch(`${BASE_URL}/authors/${author_id}`);
+  return response.json();
+};
+
+export const searchAuthors = async (query: string): Promise<Author[]> => {
+  const response = await fetch(`${BASE_URL}/authors/search?query=${encodeURIComponent(query)}`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch author suggestions');
+  }
   return response.json();
 };
 
@@ -370,20 +435,6 @@ export const updateAuthorData = async (
   return response.json();
 };
 
-export const deleteAuthorData = async (author_id: number): Promise<void> => {
-  const response = await fetch(`${BASE_URL}/authors/${author_id}`, {
-    method: 'DELETE',
-    headers: {
-      ...authHeader()
-    }
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Failed to delete author: ${error}`);
-  }
-};
-
 export const createAuthor = async (author: Author): Promise<Author> => {
   const response = await fetch(`${BASE_URL}/authors/`, {
     method: 'POST',
@@ -402,6 +453,34 @@ export const createAuthor = async (author: Author): Promise<Author> => {
   return response.json();
 }
 
+export const deleteAuthorData = async (author_id: number): Promise<void> => {
+  const response = await fetch(`${BASE_URL}/authors/${author_id}`, {
+    method: 'DELETE',
+    headers: {
+      ...authHeader()
+    }
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to delete author: ${error}`);
+  }
+};
+
+// =============================================================================
+// Error Handling
+// =============================================================================
+
+// Helper for handling HTTP errors
+const handleResponse = async (response: Response) => {
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail || `API Error: ${response.status}`);
+  }
+  
+  return response.json();
+};
+
 const handleApiError = (error: any) => {
   if (error.response?.status === 401) {
     // Unauthorized - clear token and redirect to login
@@ -409,51 +488,4 @@ const handleApiError = (error: any) => {
     throw new Error('Session expired. Please sign in again.');
   }
   throw error;
-};
-
-export const login = async (email: string, password: string): Promise<LoginResponse> => {
-  try {
-    const response = await fetch(`${BASE_URL}/auth/token`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: new URLSearchParams({
-        username: email, // FastAPI OAuth2 expects 'username' even for email
-        password: password,
-        grant_type: 'password'
-      })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || 'Login failed');
-    }
-
-    return response.json();
-  } catch (error) {
-    if (error instanceof Error) {
-      throw new Error(error.message);
-    }
-    throw new Error('Login failed. Please check your credentials.');
-  }
-};
-
-export const testAuth = async (): Promise<any> => {
-  const response = await fetch(`${BASE_URL}/auth/test-token`, {
-    headers: {
-      ...authHeader()
-    }
-  });
-  return handleResponse(response);
-};
-
-// Helper to inspect the token
-export const debugToken = () => {
-  const token = localStorage.getItem('auth_token');
-  console.log('Stored token:', token);
-  if (token) {
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    console.log('Token payload:', payload);
-  }
 };
