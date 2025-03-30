@@ -43,7 +43,6 @@ const ImageDetailModal: React.FC<ImageDetailModalProps> = ({
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error) {
-      console.error('Failed to download image:', error);
       toast.error('Failed to download image');
     }
   };
@@ -72,7 +71,6 @@ const ImageDetailModal: React.FC<ImageDetailModalProps> = ({
       setIsEditing(false);
       toast.success('Changes saved successfully');
     } catch (error) {
-      console.error('Failed to update image:', error);
       toast.error('Failed to save changes');
     }
   };
