@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { Users, PlusCircle, User, AlertCircle, X } from 'lucide-react';
+import { UsersRound, PlusCircle, UserRound, AlertCircle, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 import TransitionWrapper from '@/components/TransitionWrapper';
 import Button from '@/components/Button';
 import Navbar from '@/components/Navbar';
@@ -14,7 +15,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getAuthorsData, createAuthor, updateAuthorData, deleteAuthorData } from '@/utils/api';
+import { 
+  getAuthorsData, 
+  createAuthor, 
+  updateAuthorData, 
+  deleteAuthorData, 
+  getCurrentUser 
+} from '@/utils/api';
+import type { User } from '@/utils/types';
 
 interface Author {
   id: number;
@@ -29,6 +37,7 @@ interface AuthorForm {
 }
 
 const AuthorManagement = () => {
+  const navigate = useNavigate();
   const [authors, setAuthors] = useState<Author[]>([]);
   const [formData, setFormData] = useState<AuthorForm>({ name: "", email: "" });
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -36,8 +45,28 @@ const AuthorManagement = () => {
   const [authorToDelete, setAuthorToDelete] = useState<Author | null>(null);
 
   useEffect(() => {
+    checkAdminAccess();
+  }, []);
+
+  useEffect(() => {
     fetchAuthors();
   }, []);
+
+  const checkAdminAccess = async () => {
+    try {
+      const userData = await getCurrentUser();
+      
+      if (!userData.is_admin && !userData.is_superuser) {
+        toast.error("Admin access required");
+        navigate('/');
+        return;
+      }
+      fetchAuthors();
+    } catch (error) {
+      toast.error("Authentication failed");
+      navigate('/login');
+    }
+  };
 
   const fetchAuthors = async () => {
     setIsLoading(true);
@@ -45,6 +74,11 @@ const AuthorManagement = () => {
       const data = await getAuthorsData();
       setAuthors(data);
     } catch (error) {
+      if (error instanceof Error && error.message.includes('401')) {
+        toast.error("Session expired. Please login again");
+        navigate('/login');
+        return;
+      }
       toast.error("Failed to fetch authors");
     } finally {
       setIsLoading(false);
@@ -71,11 +105,15 @@ const AuthorManagement = () => {
         });
         toast.success("Author created successfully");
       }
-      
       setFormData({ name: "", email: "" });
       setEditingId(null);
       fetchAuthors();
     } catch (error) {
+      if (error instanceof Error && error.message.includes('401')) {
+        toast.error("Session expired. Please login again");
+        navigate('/login');
+        return;
+      }
       toast.error(`Failed to ${editingId ? "update" : "create"} author`);
     }
   };
@@ -93,6 +131,11 @@ const AuthorManagement = () => {
       fetchAuthors();
       setAuthorToDelete(null);
     } catch (error) {
+      if (error instanceof Error && error.message.includes('401')) {
+        toast.error("Session expired. Please login again");
+        navigate('/login');
+        return;
+      }
       toast.error("Failed to delete author");
     }
   };
@@ -118,7 +161,7 @@ const AuthorManagement = () => {
         {/* Author Form Card */}
         <div className="bg-card border border-border rounded-xl p-4 sm:p-6 mb-8">
           <h2 className="text-lg font-medium flex items-center gap-2 mb-4">
-            <User className="h-5 w-5" />
+            <UserRound className="h-5 w-5" />
             {editingId ? "Edit Author" : "Add New Author"}
           </h2>
 
@@ -178,7 +221,7 @@ const AuthorManagement = () => {
         {/* Authors Table Card */}
         <div className="bg-card border border-border rounded-xl p-4 sm:p-6">
           <h2 className="text-lg font-medium flex items-center gap-2 mb-4">
-            <Users className="h-5 w-5" />
+            <UsersRound className="h-5 w-5" />
             Author List
           </h2>
 

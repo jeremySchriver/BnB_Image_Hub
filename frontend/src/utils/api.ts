@@ -19,6 +19,7 @@ export interface User {
   username: string;
   is_active: boolean;
   is_superuser: boolean;
+  is_admin: boolean;
   date_joined: string;
   last_login?: string;
 }
