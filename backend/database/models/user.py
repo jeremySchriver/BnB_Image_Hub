@@ -10,6 +10,7 @@ class User(Base):
     username = Column(String, unique=True, index=True)
     hashed_password = Column(String)
     is_active = Column(Boolean, default=True)
+    is_admin = Column(Boolean, default=False)
     is_superuser = Column(Boolean, default=False)
     date_joined = Column(DateTime, default=datetime.utcnow)
     last_login = Column(DateTime, nullable=True)

@@ -156,6 +156,74 @@ export const updateUserProfile = async (userData: {
   }
 };
 
+export const setUserAdminStatus = async (email: string, isAdmin: boolean) => {
+  const token = localStorage.getItem('auth_token');
+  if (!token) throw new Error('No authentication token found');
+
+  const response = await fetch(
+    `${BASE_URL}/users/${email}/admin`,
+    {
+      method: isAdmin ? 'POST' : 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to update admin status');
+  }
+
+  return await response.json();
+};
+
+export const getAllUsers = async (): Promise<User[]> => {
+  const token = localStorage.getItem('auth_token');
+  if (!token) throw new Error('No authentication token found');
+
+  const response = await fetch(
+    `${BASE_URL}/users/all`,
+    {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to fetch users');
+  }
+
+  return await response.json();
+};
+
+export const deleteUser = async (email: string): Promise<void> => {
+  const token = localStorage.getItem('auth_token');
+  if (!token) throw new Error('No authentication token found');
+
+  const response = await fetch(
+    `${BASE_URL}/users/${email}`,
+    {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to delete user');
+  }
+
+  return await response.json();
+};
+
 // =============================================================================
 // Authentication Helpers
 // =============================================================================

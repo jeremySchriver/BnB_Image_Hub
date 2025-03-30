@@ -11,19 +11,15 @@ import ImageTagging from "./pages/ImageTagging";
 import ImageSearch from "./pages/ImageSearch";
 import AuthorManagement from "./pages/AuthorManagement";
 import AccountManagement from "./pages/AccountManagement";
+import UserManagement from "./pages/UserManagement";
 import NotFound from "./pages/NotFound";
 import { isAuthenticated } from "./utils/api";
+import ProtectedRoute from '@/components/ProtectedRoute';
+import RequireSuperuser from '@/components/RequireSuperuser';
 
 const queryClient = new QueryClient();
 
-// Protected route component
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  if (!isAuthenticated()) {
-    return <Navigate to="/login" replace />;
-  }
-  
-  return <>{children}</>;
-};
+
 
 // ScrollToTop component to ensure page scrolls to top on route change
 const ScrollToTop = () => {
@@ -89,6 +85,16 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <AccountManagement />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/users" 
+            element={
+              <ProtectedRoute>
+                <RequireSuperuser>
+                  <UserManagement />
+                </RequireSuperuser>
               </ProtectedRoute>
             } 
           />

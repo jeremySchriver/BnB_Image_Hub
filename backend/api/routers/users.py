@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
-
+from fastapi.responses import JSONResponse
 from backend.database.database import get_db
 from backend.database.models.user import User
 from backend.database.schemas.user import UserCreate, UserResponse, UserUpdate
@@ -12,7 +12,9 @@ from backend.database.services.user_service import (
     get_user_by_email,
     update_user,
     get_current_user,
-    verify_password
+    verify_password,
+    add_admin_flag,
+    remove_admim_flag
 )
 from backend.api.auth import get_current_user
 
@@ -20,6 +22,94 @@ router = APIRouter(
     prefix="/users",
     tags=["users"]
 )
+
+@router.delete("/{user_email}", response_model=None)
+async def delete_user(
+    user_email: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Delete a user. Only accessible by superusers."""
+    if not current_user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only superusers can delete users"
+        )
+    
+    if user_email == current_user.email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete your own account"
+        )
+    
+    try:
+        user_to_delete = get_user_by_email(db, user_email)
+        if not user_to_delete:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+            
+        if user_to_delete.is_superuser:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cannot delete superuser accounts"
+            )
+            
+        db.delete(user_to_delete)
+        db.commit()
+        return JSONResponse(content={"message": "User deleted successfully"})
+        
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+# Admin flag routes
+@router.post("/{user_email}/admin", response_model=UserResponse)
+async def set_admin_status(
+    user_email: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if not current_user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only superusers can modify admin status"
+        )
+    
+    try:
+        updated_user = add_admin_flag(db, user_email)
+        return updated_user
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+@router.delete("/{user_email}/admin", response_model=UserResponse)
+async def remove_admin_status(
+    user_email: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if not current_user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only superusers can modify admin status"
+        )
+    
+    try:
+        updated_user = remove_admim_flag(db, user_email)
+        return updated_user
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
 
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def create_new_user(user: UserCreate, db: Session = Depends(get_db)):
@@ -50,6 +140,27 @@ def read_user_by_username(username: str, db: Session = Depends(get_db)):
     if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")
     return db_user
+
+@router.get("/all", response_model=List[UserResponse])
+async def get_all_users(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get all users. Only accessible by superusers."""
+    if not current_user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only superusers can view all users"
+        )
+    
+    try:
+        users = db.query(User).all()
+        return users
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
 
 @router.put("/by_id/{user_id}", response_model=UserResponse)
 def update_user_info(

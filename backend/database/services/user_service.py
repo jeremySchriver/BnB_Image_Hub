@@ -32,7 +32,9 @@ def create_user(db: Session, user_data: UserCreate) -> User:
         email=user_data.email,
         username=user_data.username,
         hashed_password=hashed_password,
-        is_active=True
+        is_active=True,
+        is_admin=user_data.is_admin,
+        is_superuser=user_data.is_superuser  
     )
     db.add(db_user)
     db.commit()
@@ -99,6 +101,26 @@ def remove_super_user(db: Session, email: str) -> User:
         raise HTTPException(status_code=404, detail=f"User with email {email} not found")
     
     user.is_superuser = False
+    db.commit()
+    db.refresh(user)
+    return user
+
+def add_admin_flag(db: Session, email: str) -> User:
+    user = get_user_by_email(db, email)
+    if not user:
+        raise HTTPException(status_code=404, detail=f"User with email {email} not found")
+    
+    user.is_admin = True
+    db.commit()
+    db.refresh(user)
+    return user
+
+def remove_admim_flag(db: Session, email: str) -> User:
+    user = get_user_by_email(db, email)
+    if not user:
+        raise HTTPException(status_code=404, detail=f"User with email {email} not found")
+    
+    user.is_admin = False
     db.commit()
     db.refresh(user)
     return user
