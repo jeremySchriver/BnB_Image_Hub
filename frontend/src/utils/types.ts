@@ -2,9 +2,14 @@
 // Core type definitions for the application
 
 export interface User {
-  id: string;
+  id: number;
   email: string;
-  name?: string;
+  username: string;
+  is_active: boolean;
+  is_admin: boolean;
+  is_superuser: boolean;
+  date_joined: string;
+  last_login?: string;
 }
 
 export interface Image {

@@ -51,7 +51,6 @@ const ImageSearch = () => {
       try {
         await fetchImages();
       } catch (error) {
-        console.error('Failed to initialize search:', error);
       } finally {
         setHasInitialized(true);
       }
@@ -94,7 +93,6 @@ const ImageSearch = () => {
       setImages(results);
     } catch (error) {
       if (hasInitialized) {
-        console.error('Failed to fetch images:', error);
         toast.error('Failed to load images');
       }
       setImages([]);
@@ -130,7 +128,6 @@ const ImageSearch = () => {
       
       toast.success('Image deleted successfully');
     } catch (error) {
-      console.error('Failed to delete image:', error);
       toast.error('Failed to delete image');
     }
   };

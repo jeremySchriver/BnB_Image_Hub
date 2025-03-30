@@ -36,7 +36,6 @@ const AuthorInput: React.FC<AuthorInputProps> = ({
           setSuggestions(authorSuggestions.map(author => author.name));
           setShowSuggestions(true);
         } catch (error) {
-          console.error('Failed to fetch author suggestions:', error);
           setSuggestions([]);
           setShowSuggestions(false);
         }

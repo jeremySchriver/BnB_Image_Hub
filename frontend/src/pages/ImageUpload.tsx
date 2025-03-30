@@ -185,7 +185,6 @@ const ImageUpload = () => {
         }
       }
     } catch (error) {
-      console.error('Upload error:', error);
       setFiles(prev => 
         prev.map(file => ({
           ...file,

@@ -36,7 +36,6 @@ const ImageTagging = () => {
         toast.info('No untagged images available');
       }
     } catch (error) {
-      console.error('Error fetching next untagged image:', error);
       // Only show error toast for actual API failures
       if (error instanceof Error && error.message !== 'No images found') {
         toast.error('Failed to connect to image service');
@@ -85,7 +84,6 @@ const ImageTagging = () => {
       }
       
     } catch (error) {
-      console.error('Error saving image tags:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to save tags';
       toast.error(errorMessage);
     } finally {
