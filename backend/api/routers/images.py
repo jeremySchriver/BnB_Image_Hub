@@ -12,16 +12,26 @@ from backend.database.schemas.image import ImageResponse, ImageUpdate, ImageCrea
 from backend.database.schemas.tag import TagResponse
 from backend.database.models.tag import Tag
 from backend.database.models.author import Author
-from backend.database.services.image_service import get_image, get_all_untagged_images, get_next_untagged_image, update_image_tags, update_image_metadata, _generate_hash_filename, create_image, delete_image
+from backend.database.services.image_service import (
+    get_image, get_all_untagged_images, get_next_untagged_image,
+    update_image_tags, update_image_metadata, _generate_hash_filename,
+    create_image, delete_image
+)
 from backend.config import TAG_PREVIEW_DIR, SEARCH_PREVIEW_DIR, UNTAGGED_DIR
 from backend.processor.thumbnail_generator import generate_previews
 
+# Configure logging
 logger = logging.getLogger(__name__)
 
+# Initialize router
 router = APIRouter(
     prefix="/images",
     tags=["images"]
 )
+
+#############################################
+# Image Content Endpoints
+#############################################
 
 '''Get image content from the database, including actual image file.'''
 @router.get("/content/{image_id}")
@@ -29,7 +39,19 @@ async def get_image_content(
     image_id: int,
     db: Session = Depends(get_db)
 ):
-    """Serve the actual image file content."""
+    """
+    Serve the actual image file content.
+    
+    Args:
+        image_id (int): ID of the image to retrieve
+        db (Session): Database session
+        
+    Returns:
+        FileResponse: The image file
+        
+    Raises:
+        HTTPException: 404 if image not found, 500 for server errors
+    """
     try:
         image = get_image(db, image_id)
         if not image:
@@ -52,6 +74,10 @@ async def get_image_content(
             detail=f"Failed to get image content: {str(e)}"
         )
 
+#############################################
+# Image Tagging Endpoints
+#############################################
+
 '''Update tag method'''
 @router.put("/tags/{image_id}")
 def update_tags(
@@ -59,7 +85,17 @@ def update_tags(
     update_data: ImageUpdate,
     db: Session = Depends(get_db)
 ):
-    """Update image tags, generate thumbnail, and move to tagged storage."""
+    """
+    Update image tags, generate thumbnail, and move to tagged storage.
+    
+    Args:
+        image_id (int): ID of the image to update
+        update_data (ImageUpdate): New tag and metadata information
+        db (Session): Database session
+        
+    Returns:
+        dict: Updated image information
+    """
     try:
         updated_image = update_image_tags(
             db=db,
@@ -83,39 +119,48 @@ def update_tags(
             status_code=500,
             detail=f"Failed to process image: {str(e)}"
         )
-
-'''Untagged image page methods'''
-@router.get("/untagged/full_list")
-def get_untagged_list(db: Session = Depends(get_db)):
-    """Get all untagged images from the database."""
-    try:
-        # Query untagged images directly from database
-        untagged_images = get_all_untagged_images(db)
         
-        # Format response
-        response = []
-        for image in untagged_images:
-            image_data = {
-                "id": str(image.id),
-                "filename": image.filename,
-                "tagged_full_path": None,
-                "tagged_thumb_path": None,
-                "untagged_full_path": image.untagged_full_path,
-                "untagged_thumb_path": image.untagged_thumb_path,
-                "tags": [tag.name for tag in image.tags],
-                "date_added": image.date_added.isoformat() if image.date_added else None,
-                "author": image.author.name if image.author else None
-            }
-            response.append(image_data)
+@router.put("/metadata/{image_id}")
+def update_metadata(
+    image_id: int,
+    update_data: ImageUpdate,
+    db: Session = Depends(get_db)
+):
+    """
+    Update image metadata only (tags and author) without file operations.
+    
+    Args:
+        image_id (int): ID of the image to update
+        update_data (ImageUpdate): New metadata information
+        db (Session): Database session
+    """
+    try:
+        updated_image = update_image_metadata(
+            db=db,
+            image_id=image_id,
+            tags=update_data.tags,
+            author=update_data.author
+        )
+        
+        if not updated_image:
+            raise HTTPException(
+                status_code=404,
+                detail="Image not found"
+            )
             
-        return response
-
+        return updated_image
+        
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to get untagged images list: {str(e)}"
+            detail=f"Failed to update image metadata: {str(e)}"
         )
         
+#############################################
+# Untagged Image Endpoints
+#############################################
+
+'''Untagged image page methods'''       
 @router.get("/untagged/next")
 def get_untagged_list(db: Session = Depends(get_db)):
     """Get the next untagged image from the database."""
@@ -146,13 +191,26 @@ def get_untagged_list(db: Session = Depends(get_db)):
             detail=f"Failed to get untagged images list: {str(e)}"
         )
         
+#############################################
+# Search Endpoints
+#############################################
+        
 '''Search for images by tags'''
 @router.get("/search/tags/{tag_name}", response_model=List[ImageResponse])
 def get_images_by_tag(
     tag_name: str,
     db: Session = Depends(get_db)
 ):
-    """Get images by tag name from the database."""
+    """
+    Get images by tag name from the database.
+    
+    Args:
+        tag_name (str): Name of the tag to search for
+        db (Session): Database session
+        
+    Returns:
+        List[ImageResponse]: List of matching images
+    """
     try:
         images = db.query(Image).join(Image.tags).filter(Tag.name == tag_name).all()
         
@@ -271,7 +329,17 @@ def search_images(
     author: Optional[str] = Query(None, description="Author name to filter by"),
     db: Session = Depends(get_db)
 ):
-    """Search images with optional tag and author filters."""
+    """
+    Search images with optional tag and author filters.
+    
+    Args:
+        tags (str, optional): Comma-separated list of tags
+        author (str, optional): Author name to filter by
+        db (Session): Database session
+        
+    Returns:
+        List[dict]: List of matching images
+    """
     try:
         # Start with base query
         query = db.query(Image)
@@ -316,6 +384,10 @@ def search_images(
             status_code=500,
             detail=f"Failed to search images: {str(e)}"
         )
+
+#############################################
+# Preview Image Endpoints
+#############################################
         
 @router.get("/preview/{size}/{image_id}")
 async def get_preview(
@@ -323,7 +395,17 @@ async def get_preview(
     image_id: int, 
     db: Session = Depends(get_db)
 ):
-    """Get pre-generated preview image."""
+    """
+    Get pre-generated preview image.
+    
+    Args:
+        size (str): Size of preview ('preview' or 'search')
+        image_id (int): ID of the image
+        db (Session): Database session
+        
+    Returns:
+        FileResponse: Preview image file
+    """
     try:
         if size not in ['preview', 'search']:
             raise HTTPException(status_code=400, detail="Invalid preview size")
@@ -347,41 +429,25 @@ async def get_preview(
             detail=f"Error retrieving preview: {str(e)}"
         )
         
-@router.put("/metadata/{image_id}")
-def update_metadata(
-    image_id: int,
-    update_data: ImageUpdate,
-    db: Session = Depends(get_db)
-):
-    """Update image metadata only (tags and author) without file operations."""
-    try:
-        updated_image = update_image_metadata(
-            db=db,
-            image_id=image_id,
-            tags=update_data.tags,
-            author=update_data.author
-        )
-        
-        if not updated_image:
-            raise HTTPException(
-                status_code=404,
-                detail="Image not found"
-            )
-            
-        return updated_image
-        
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to update image metadata: {str(e)}"
-        )
+#############################################
+# Upload and Delete Endpoints
+#############################################
         
 @router.post("/upload/batch")
 async def upload_batch_images(
     files: List[UploadFile] = File(...),
     db: Session = Depends(get_db)
 ):
-    """Upload multiple images at once."""
+    """
+    Upload multiple images at once.
+    
+    Args:
+        files (List[UploadFile]): List of files to upload
+        db (Session): Database session
+        
+    Returns:
+        dict: Upload results including success/failure counts
+    """
     try:
         results = {
             "success": True,

@@ -1,15 +1,39 @@
 
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Upload, Tag, Search, LogOut, UserRoundMinus } from 'lucide-react';
+import { Upload, Tag, Search, LogOut, UserRoundMinus, UserRoundCog, UserXIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useState, useEffect } from 'react';
+import { getCurrentUser } from '@/utils/api';
+import type { User } from '@/utils/types';
+
+interface NavItemProps {
+  to: string;
+  icon: React.ReactNode;
+  label: string;
+  isActive: boolean;
+}
 
 const Navbar = () => {
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const location = useLocation();
 
   const isActive = (path: string) => {
     return location.pathname === path;
   };
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const user = await getCurrentUser();
+        setCurrentUser(user as User);
+      } catch (error) {
+        console.error('Failed to fetch user data');
+      }
+    };
+    
+    fetchUser();
+  }, []);
 
   const handleLogout = () => {
     // Clear any tokens/state
@@ -52,6 +76,20 @@ const Navbar = () => {
             label="Authors" 
             isActive={isActive('/authors')} 
           />
+          <NavItem 
+            to="/account" 
+            icon={<UserRoundCog className="h-5 w-5" />} 
+            label="My Account" 
+            isActive={isActive('/account')} 
+          />
+          {currentUser?.is_superuser && (
+            <NavItem 
+              to="/users" 
+              icon={<UserXIcon className="h-5 w-5" />} 
+              label="User Management" 
+              isActive={isActive('/users')} 
+            />
+          )}
         </div>
         
         <div className="hidden sm:flex items-center">

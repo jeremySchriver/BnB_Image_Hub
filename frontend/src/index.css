@@ -107,6 +107,21 @@
   .clip-path-tag {
     clip-path: polygon(0% 0%, 90% 0%, 100% 50%, 90% 100%, 0% 100%);
   }
+
+  /* Remove cursor from all elements */
+  * {
+    caret-color: transparent;
+  }
+
+  /* Only show cursor in actual input fields where typing is needed */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  input[type="number"],
+  textarea {
+    caret-color: currentColor;
+  }
 }
 
 /* Custom Animations */
