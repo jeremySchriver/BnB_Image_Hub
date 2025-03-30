@@ -12,6 +12,8 @@ from backend.database.schemas.image import ImageResponse, ImageUpdate, ImageCrea
 from backend.database.schemas.tag import TagResponse
 from backend.database.models.tag import Tag
 from backend.database.models.author import Author
+from backend.database.models.user import User
+from backend.database.schemas.user import UserCreate, UserResponse, UserUpdate
 from backend.database.services.image_service import (
     get_image, get_all_untagged_images, get_next_untagged_image,
     update_image_tags, update_image_metadata, _generate_hash_filename,
@@ -19,6 +21,7 @@ from backend.database.services.image_service import (
 )
 from backend.config import TAG_PREVIEW_DIR, SEARCH_PREVIEW_DIR, UNTAGGED_DIR
 from backend.processor.thumbnail_generator import generate_previews
+from backend.api.auth import get_current_user
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -512,8 +515,18 @@ async def upload_batch_images(
         )
         
 @router.delete("/images/{image_id}")
-async def delete_image_endpoint(image_id: int, db: Session = Depends(get_db)):
+async def delete_image_endpoint(
+    image_id: int, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)  # Add this line
+):
     """Delete an image and all its associated files."""
+    # Check if user is admin
+    if not (current_user.is_admin or current_user.is_superuser):
+        raise HTTPException(
+            status_code=403,
+            detail="Only administrators can delete images"
+        )
     image = get_image(db, image_id)
     if not image:
         raise HTTPException(status_code=404, detail="Image not found")

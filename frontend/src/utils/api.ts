@@ -352,6 +352,9 @@ export const deleteImage = async (imageId: string | number): Promise<void> => {
   });
 
   if (!response.ok) {
+    if (response.status === 403) {
+      throw new Error('You do not have permission to delete images');
+    }
     const error = await response.text();
     throw new Error(`Failed to delete image: ${error}`);
   }

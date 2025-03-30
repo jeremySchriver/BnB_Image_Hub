@@ -14,7 +14,8 @@ import {
   getActualImage, 
   updateImageMetadata, 
   updateImageTags,
-  deleteImage 
+  deleteImage,
+  getCurrentUser
 } from '@/utils/api';
 import type { ImageMetadata } from '@/utils/api';
 import ImageDetailModal from '@/components/ImageDetailModal';
@@ -29,6 +30,7 @@ const ImageSearch = () => {
   const [hasInitialized, setHasInitialized] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [selectedImage, setSelectedImage] = useState<ImageMetadata | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // Modal edit states
   const [isEditing, setIsEditing] = useState(false);
@@ -57,6 +59,10 @@ const ImageSearch = () => {
     };
 
     initializeSearch();
+  }, []);
+
+  useEffect(() => {
+    checkAdminAccess();
   }, []);
 
   // Filter change effect
@@ -101,6 +107,17 @@ const ImageSearch = () => {
     }
   };
 
+  const checkAdminAccess = async () => {
+    try {
+      const userData = await getCurrentUser();
+      setIsAdmin(userData.is_admin || userData.is_superuser);
+    } catch (error) {
+      console.error('Failed to check admin status');
+      setIsAdmin(false);
+    }
+  };
+  
+
   // ===============================
   // Event Handlers
   // ===============================
@@ -114,21 +131,20 @@ const ImageSearch = () => {
   };
 
   const handleDelete = async () => {
-    if (!selectedImage) return;
+    if (!selectedImage || !isAdmin) return;
     
     try {
       await deleteImage(selectedImage.id);
-      
-      // Remove image from state
       setImages(prev => prev.filter(img => img.id !== selectedImage.id));
-      
-      // Close modal and confirmation
       setShowDeleteConfirm(false);
       setSelectedImage(null);
-      
       toast.success('Image deleted successfully');
     } catch (error) {
-      toast.error('Failed to delete image');
+      if (error instanceof Error && error.message.includes('403')) {
+        toast.error('You do not have permission to delete images');
+      } else {
+        toast.error('Failed to delete image');
+      }
     }
   };
 
@@ -249,6 +265,7 @@ const ImageSearch = () => {
           onClose={() => setSelectedImage(null)}
           onDelete={() => setShowDeleteConfirm(true)}
           onUpdate={handleImageUpdate}
+          isAdmin={isAdmin}
         />
       )}
 

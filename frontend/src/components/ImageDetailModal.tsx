@@ -13,6 +13,7 @@ interface ImageDetailModalProps {
   onClose: () => void;
   onDelete: () => void;
   onUpdate: (updatedImage: ImageMetadata) => void;
+  isAdmin?: boolean;
 }
 
 const ImageDetailModal: React.FC<ImageDetailModalProps> = ({
@@ -20,6 +21,7 @@ const ImageDetailModal: React.FC<ImageDetailModalProps> = ({
   onClose,
   onDelete,
   onUpdate,
+  isAdmin = false
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editTags, setEditTags] = useState<string[]>(image.tags);
@@ -247,14 +249,16 @@ const ImageDetailModal: React.FC<ImageDetailModalProps> = ({
                     <Download className="h-4 w-4" />
                     Download
                   </Button>
-                  <Button
-                    variant="destructive"
-                    onClick={onDelete}
-                    className="flex items-center gap-2"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Delete
-                  </Button>
+                  {isAdmin && (
+                    <Button
+                      variant="destructive"
+                      onClick={onDelete}
+                      className="flex items-center gap-2"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Delete
+                    </Button>
+                  )}
                 </>
               )}
               <Button variant="outline" onClick={onClose}>
