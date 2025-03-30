@@ -37,7 +37,7 @@ def purge_user_table(db: Session):
     # WARNING: This operation is irreversible!
     db.query(User).delete()
     db.commit()
-    print("Image table wiped before seeding.")
+    print("User table wiped before seeding.")
 
 if __name__ == "__main__":
     db = next(get_db()) 

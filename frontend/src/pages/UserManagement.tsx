@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Users, Shield, ShieldOff, Trash2 } from 'lucide-react';
+import { Users, Shield, ShieldOff, Trash2, UserRoundPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import TransitionWrapper from '@/components/TransitionWrapper';
 import { Button } from "@/components/ui/button";
@@ -12,14 +12,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getAllUsers, setUserAdminStatus, deleteUser } from '@/utils/api';
+import { getAllUsers, setUserAdminStatus, deleteUser, createUser } from '@/utils/api';
 import type { User } from '@/utils/types';
 import DeleteUserConfirmationDialog from '@/components/DeleteUserConfirmationDialog';
+import AddUserDialog from '@/components/AddUserDialog';
 
 const UserManagement = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
+  const [showAddUser, setShowAddUser] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -31,6 +33,13 @@ const UserManagement = () => {
       const data = await getAllUsers();
       setUsers(data as User[]);
     } catch (error) {
+      if (error instanceof Error && error.message.includes('401')) {
+        // Handle unauthorized error
+        toast.error('Session expired. Please sign in again.');
+        localStorage.removeItem('auth_token');
+        window.location.href = '/login';
+        return;
+      }
       toast.error('Failed to fetch users');
     } finally {
       setIsLoading(false);
@@ -69,20 +78,42 @@ const UserManagement = () => {
     }
   };
 
+  const handleCreateUser = async (userData: { email: string; username: string; password: string }) => {
+    try {
+      await createUser(userData);
+      toast.success('User created successfully');
+      await fetchUsers(); // Wait for this to complete
+      setShowAddUser(false);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('401')) {
+        // Handle unauthorized error
+        toast.error('Session expired. Please sign in again.');
+        localStorage.removeItem('auth_token');
+        window.location.href = '/login';
+        return;
+      }
+      toast.error(error instanceof Error ? error.message : 'Failed to create user');
+    }
+  };
   return (
     <div className="min-h-screen pb-16 sm:pb-0 sm:pt-16 bg-background">
       <Navbar />
       
       <TransitionWrapper className="container max-w-6xl py-6 sm:py-10">
-        <div className="text-center mb-6">
+        <div className="text-center mb-6 pointer-events-none">
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">User Management</h1>
           <p className="text-muted-foreground mt-2">
             Manage user roles and permissions
           </p>
         </div>
-
-        <div className="bg-card border border-border rounded-xl p-4 sm:p-6">
-          <div className="overflow-x-auto">
+        <div className="flex justify-center mb-6 pointer-events-auto">
+          <Button onClick={() => setShowAddUser(true)}>
+            <UserRoundPlus className="h-4 w-4 mr-2" />
+              Add User
+          </Button>
+        </div>
+        <div className="bg-card border border-border rounded-xl p-4 sm:p-6 select-none">
+          <div className="overflow-x-auto pointer-events-none">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -115,34 +146,36 @@ const UserManagement = () => {
                         : 'User'}
                     </TableCell>
                     <TableCell>
-                    {!user.is_superuser && (
-                        <>
-                            <Button
-                                variant={user.is_admin ? "destructive" : "default"}
-                                size="sm"
-                                onClick={() => toggleAdminStatus(user.email, user.is_admin)}
-                                >
-                                {user.is_admin ? (
-                                <>
-                                    <ShieldOff className="h-4 w-4 mr-2" />
-                                    Remove Admin
-                                </>
-                                ) : (
-                                <>
-                                    <Shield className="h-4 w-4 mr-2" />
-                                    Make Admin
-                                </>
-                                )}
-                            </Button>
-                            <Button
-                                variant="destructive"
-                                size="sm"
-                                onClick={() => handleDeleteClick(user.email)}
-                                >
-                                <Trash2 className="h-4 w-4" />
-                            </Button>
-                        </>
-                    )}
+                      <div className="pointer-events-auto flex items-center gap-2">
+                        {!user.is_superuser && (
+                            <>
+                                <Button
+                                    variant={user.is_admin ? "destructive" : "default"}
+                                    size="sm"
+                                    onClick={() => toggleAdminStatus(user.email, user.is_admin)}
+                                    >
+                                    {user.is_admin ? (
+                                    <>
+                                        <ShieldOff className="h-4 w-4 mr-2" />
+                                        Remove Admin
+                                    </>
+                                    ) : (
+                                    <>
+                                        <Shield className="h-4 w-4 mr-2" />
+                                        Make Admin
+                                    </>
+                                    )}
+                                </Button>
+                                <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => handleDeleteClick(user.email)}
+                                    >
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
+                            </>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -156,6 +189,12 @@ const UserManagement = () => {
         <DeleteUserConfirmationDialog
           onConfirm={handleDeleteConfirm}
           onCancel={handleDeleteCancel}
+        />
+      )}
+      {showAddUser && (
+        <AddUserDialog
+          onConfirm={handleCreateUser}
+          onCancel={() => setShowAddUser(false)}
         />
       )}
     </div>

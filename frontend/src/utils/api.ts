@@ -224,6 +224,28 @@ export const deleteUser = async (email: string): Promise<void> => {
   return await response.json();
 };
 
+export const createUser = async (userData: { 
+  email: string; 
+  username: string; 
+  password: string; 
+}): Promise<User> => {
+  const response = await fetch(`${BASE_URL}/users`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeader()
+    },
+    body: JSON.stringify(userData)
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to create user');
+  }
+
+  return response.json();
+};
+
 // =============================================================================
 // Authentication Helpers
 // =============================================================================
