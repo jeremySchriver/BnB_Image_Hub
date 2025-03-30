@@ -23,6 +23,68 @@ router = APIRouter(
     tags=["users"]
 )
 
+# Endpoint to add admin status for a user
+@router.post("/{user_email}/admin", response_model=UserResponse)
+async def set_admin_status(
+    user_email: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if not current_user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only superusers can modify admin status"
+        )
+    
+    try:
+        updated_user = add_admin_flag(db, user_email)
+        return updated_user
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+# Endpoint to remove admin status from a user
+@router.delete("/{user_email}/admin", response_model=UserResponse)
+async def remove_admin_status(
+    user_email: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if not current_user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only superusers can modify admin status"
+        )
+    
+    try:
+        updated_user = remove_admim_flag(db, user_email)
+        return updated_user
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+# Create a new user
+@router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+def create_new_user(user: UserCreate, db: Session = Depends(get_db)):
+    db_user = get_user_by_email(db, email=user.email)
+    if db_user:
+        raise HTTPException(
+            status_code=400,
+            detail="Email already registered"
+        )
+    db_user = get_user_by_username(db, username=user.username)
+    if db_user:
+        raise HTTPException(
+            status_code=400,
+            detail="Username already registered"
+        )
+    return create_user(db=db, user_data=user)
+
+# Endpoint to delete a user
 @router.delete("/{user_email}", response_model=None)
 async def delete_user(
     user_email: str,
@@ -68,65 +130,7 @@ async def delete_user(
             detail=str(e)
         )
 
-# Admin flag routes
-@router.post("/{user_email}/admin", response_model=UserResponse)
-async def set_admin_status(
-    user_email: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    if not current_user.is_superuser:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only superusers can modify admin status"
-        )
-    
-    try:
-        updated_user = add_admin_flag(db, user_email)
-        return updated_user
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
-
-@router.delete("/{user_email}/admin", response_model=UserResponse)
-async def remove_admin_status(
-    user_email: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    if not current_user.is_superuser:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only superusers can modify admin status"
-        )
-    
-    try:
-        updated_user = remove_admim_flag(db, user_email)
-        return updated_user
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
-
-@router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-def create_new_user(user: UserCreate, db: Session = Depends(get_db)):
-    db_user = get_user_by_email(db, email=user.email)
-    if db_user:
-        raise HTTPException(
-            status_code=400,
-            detail="Email already registered"
-        )
-    db_user = get_user_by_username(db, username=user.username)
-    if db_user:
-        raise HTTPException(
-            status_code=400,
-            detail="Username already registered"
-        )
-    return create_user(db=db, user_data=user)
-
+# Read user by ID
 @router.get("/by_id/{user_id}", response_model=UserResponse)
 def read_user(user_id: int, db: Session = Depends(get_db)):
     db_user = get_user_by_id(db, user_id=user_id)
@@ -134,13 +138,16 @@ def read_user(user_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="User not found")
     return db_user
 
-@router.get("/by_username/{username}", response_model=UserResponse)
-def read_user_by_username(username: str, db: Session = Depends(get_db)):
-    db_user = get_user_by_username(db, username=username)
-    if db_user is None:
-        raise HTTPException(status_code=404, detail="User not found")
-    return db_user
+# Update user information by ID
+@router.put("/by_id/{user_id}", response_model=UserResponse)
+def update_user_info(
+    user_id: int,
+    user_data: UserUpdate,
+    db: Session = Depends(get_db)
+):
+    return update_user(db=db, user_id=user_id, user_data=user_data)
 
+# Read all users. Only accessible by superusers.
 @router.get("/all", response_model=List[UserResponse])
 async def get_all_users(
     db: Session = Depends(get_db),
@@ -162,14 +169,7 @@ async def get_all_users(
             detail=str(e)
         )
 
-@router.put("/by_id/{user_id}", response_model=UserResponse)
-def update_user_info(
-    user_id: int,
-    user_data: UserUpdate,
-    db: Session = Depends(get_db)
-):
-    return update_user(db=db, user_id=user_id, user_data=user_data)
-
+# Endpoint to get the current authenticated user's information
 @router.get("/me", response_model=UserResponse)
 async def read_current_user(
     current_user: User = Depends(get_current_user),
@@ -181,6 +181,7 @@ async def read_current_user(
         raise HTTPException(status_code=404, detail="User not found")
     return db_user
 
+# Endpoint to update the current authenticated user's information
 @router.put("/me", response_model=UserResponse)
 async def update_current_user(
     user_data: UserUpdate,

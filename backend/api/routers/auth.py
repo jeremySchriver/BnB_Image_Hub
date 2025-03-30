@@ -83,10 +83,6 @@ async def login_for_access_token(
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
-@router.get("/test-token")
-async def test_token(current_user: User = Depends(get_current_user)):
-    return {"message": "Token is valid", "user_id": current_user.id}
-
 @router.get("/me", response_model=UserResponse)
 async def get_current_auth_user(current_user: User = Depends(get_current_user)):
     """Get current authenticated user."""

@@ -160,38 +160,7 @@ def update_metadata(
 # Untagged Image Endpoints
 #############################################
 
-'''Untagged image page methods'''
-@router.get("/untagged/full_list")
-def get_untagged_list(db: Session = Depends(get_db)):
-    """Get all untagged images from the database."""
-    try:
-        # Query untagged images directly from database
-        untagged_images = get_all_untagged_images(db)
-        
-        # Format response
-        response = []
-        for image in untagged_images:
-            image_data = {
-                "id": str(image.id),
-                "filename": image.filename,
-                "tagged_full_path": None,
-                "tagged_thumb_path": None,
-                "untagged_full_path": image.untagged_full_path,
-                "untagged_thumb_path": image.untagged_thumb_path,
-                "tags": [tag.name for tag in image.tags],
-                "date_added": image.date_added.isoformat() if image.date_added else None,
-                "author": image.author.name if image.author else None
-            }
-            response.append(image_data)
-            
-        return response
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to get untagged images list: {str(e)}"
-        )
-        
+'''Untagged image page methods'''       
 @router.get("/untagged/next")
 def get_untagged_list(db: Session = Depends(get_db)):
     """Get the next untagged image from the database."""
