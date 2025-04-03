@@ -1,10 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
-
+import logging
 from backend.database.database import get_db
+from backend.database.models.user import User
 from backend.database.schemas.author import AuthorResponse, AuthorCreate, AuthorUpdate
 from backend.database.services.author_service import search_authors as search_authors_service, get_author_list, get_author_by_id, get_author_by_email, create_author, delete_email_by_id
+
+from backend.api.auth import get_current_user
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/authors",
@@ -66,7 +72,18 @@ def update_author(author_id: int, author_data: AuthorUpdate, db: Session = Depen
     return db_author
 
 @router.delete("/{author_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_author(author_id: int, db: Session = Depends(get_db)):
+def delete_author(
+    author_id: int, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # Check if user is admin
+    if not (current_user.is_admin or current_user.is_superuser):
+        raise HTTPException(
+            status_code=403,
+            detail="Only administrators can delete images"
+        )
+    
     author = delete_email_by_id(db, author_id)
     if not author:
         raise HTTPException(status_code=404, detail="Author not found")

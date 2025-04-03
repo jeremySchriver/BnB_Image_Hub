@@ -76,7 +76,7 @@ const Navbar = () => {
             label="My Account" 
             isActive={isActive('/account')} 
           />
-          {currentUser?.is_superuser || currentUser?.is_admin && (
+          {(currentUser?.is_superuser || currentUser?.is_admin) && (
             <NavItem 
               to="/authors" 
               icon={<UserRoundMinus className="h-5 w-5" />} 
