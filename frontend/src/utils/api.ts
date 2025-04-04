@@ -132,9 +132,9 @@ export const updateUserProfile = async (userData: {
   try {
     const response = await fetch(`${BASE_URL}/users/me`, {
       method: 'PUT',
+      credentials: 'include', // Important for sending cookies
       headers: {
         'Content-Type': 'application/json',
-        ...authHeader()
       },
       body: JSON.stringify(userData)
     });
@@ -144,10 +144,12 @@ export const updateUserProfile = async (userData: {
       throw new Error(errorData.detail || 'Failed to update profile');
     }
 
-    const updatedUser = await response.json();
-    return updatedUser;
+    return await response.json();
   } catch (error) {
-    throw error;
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('Failed to update profile');
   }
 };
 

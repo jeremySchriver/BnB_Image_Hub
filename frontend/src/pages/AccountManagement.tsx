@@ -78,16 +78,25 @@ const AccountManagement = () => {
       if (formData.newPassword || formData.currentPassword) {
         if (!formData.currentPassword) {
           toast.error("Current password is required to change password");
+          setIsLoading(false);
           return;
         }
   
         if (!formData.newPassword) {
           toast.error("New password is required");
+          setIsLoading(false);
+          return;
+        }
+  
+        if (formData.newPassword.length < 8) {
+          toast.error("New password must be at least 8 characters long");
+          setIsLoading(false);
           return;
         }
   
         if (formData.newPassword !== formData.confirmPassword) {
           toast.error("New passwords don't match");
+          setIsLoading(false);
           return;
         }
   
@@ -97,6 +106,7 @@ const AccountManagement = () => {
   
       if (Object.keys(updateData).length === 0) {
         toast.error("No changes to update");
+        setIsLoading(false);
         return;
       }
   
