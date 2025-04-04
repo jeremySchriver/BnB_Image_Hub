@@ -75,9 +75,16 @@ const AuthorInput: React.FC<AuthorInputProps> = ({
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setSelectedIndex(prev => Math.max(prev - 1, -1));
-    } else if (e.key === 'Enter' && selectedIndex >= 0) {
+    } else if (e.key === 'Enter') {
       e.preventDefault();
-      handleSelection(suggestions[selectedIndex]);
+      if (selectedIndex >= 0) {
+        onChange(suggestions[selectedIndex]);
+      } else if (inputValue) {
+        onChange(inputValue);
+      }
+      setInputValue('');
+      setSuggestions([]);
+      setShowSuggestions(false);
     } else if (e.key === 'Escape') {
       setShowSuggestions(false);
     }
