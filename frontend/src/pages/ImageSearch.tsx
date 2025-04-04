@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search as SearchIcon, Tag, Filter, X, HelpCircle, User, Download, Trash2 } from 'lucide-react';
+import { Search as Tag, Filter, HelpCircle, User } from 'lucide-react';
 import { toast } from 'sonner';
 import TransitionWrapper from '@/components/TransitionWrapper';
 import Button from '@/components/Button';
@@ -7,14 +7,11 @@ import Navbar from '@/components/Navbar';
 import ImageCard from '@/components/ImageCard';
 import TagInput from '@/components/TagInput';
 import AuthorInput from '@/components/AuthorInput';
-import { formatFileSize } from '@/lib/utils';
 import { 
   searchImages, 
-  getPreviewUrl, 
-  getActualImage, 
-  updateImageMetadata, 
-  updateImageTags,
-  deleteImage 
+  imageUrls, 
+  deleteImage,
+  getCurrentUser
 } from '@/utils/api';
 import type { ImageMetadata } from '@/utils/api';
 import ImageDetailModal from '@/components/ImageDetailModal';
@@ -29,6 +26,7 @@ const ImageSearch = () => {
   const [hasInitialized, setHasInitialized] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [selectedImage, setSelectedImage] = useState<ImageMetadata | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // Modal edit states
   const [isEditing, setIsEditing] = useState(false);
@@ -57,6 +55,10 @@ const ImageSearch = () => {
     };
 
     initializeSearch();
+  }, []);
+
+  useEffect(() => {
+    checkAdminAccess();
   }, []);
 
   // Filter change effect
@@ -101,6 +103,17 @@ const ImageSearch = () => {
     }
   };
 
+  const checkAdminAccess = async () => {
+    try {
+      const userData = await getCurrentUser();
+      setIsAdmin(userData.is_admin || userData.is_superuser);
+    } catch (error) {
+      console.error('Failed to check admin status');
+      setIsAdmin(false);
+    }
+  };
+  
+
   // ===============================
   // Event Handlers
   // ===============================
@@ -114,21 +127,20 @@ const ImageSearch = () => {
   };
 
   const handleDelete = async () => {
-    if (!selectedImage) return;
+    if (!selectedImage || !isAdmin) return;
     
     try {
       await deleteImage(selectedImage.id);
-      
-      // Remove image from state
       setImages(prev => prev.filter(img => img.id !== selectedImage.id));
-      
-      // Close modal and confirmation
       setShowDeleteConfirm(false);
       setSelectedImage(null);
-      
       toast.success('Image deleted successfully');
     } catch (error) {
-      toast.error('Failed to delete image');
+      if (error instanceof Error && error.message.includes('403')) {
+        toast.error('You do not have permission to delete images');
+      } else {
+        toast.error('Failed to delete image');
+      }
     }
   };
 
@@ -221,7 +233,7 @@ const ImageSearch = () => {
               {images.map((image) => (
                 <ImageCard
                   key={image.id}
-                  src={getPreviewUrl(image.id, 'search')}
+                  src={imageUrls.getPreview(image.id, 'search')}
                   alt={`Image ${image.id}`}
                   tags={image.tags}
                   author={image.author}
@@ -249,6 +261,7 @@ const ImageSearch = () => {
           onClose={() => setSelectedImage(null)}
           onDelete={() => setShowDeleteConfirm(true)}
           onUpdate={handleImageUpdate}
+          isAdmin={isAdmin}
         />
       )}
 

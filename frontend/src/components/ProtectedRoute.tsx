@@ -1,6 +1,7 @@
-import React, { useEffect } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { isAuthenticated } from '@/utils/api';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -8,20 +9,34 @@ interface ProtectedRouteProps {
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const location = useLocation();
-  const token = localStorage.getItem('auth_token');
+  const navigate = useNavigate();
+  const [isVerifying, setIsVerifying] = useState(true);
+  const [isAuthed, setIsAuthed] = useState(false);
 
   useEffect(() => {
-    if (!token) {
-      toast.error('Please sign in to access this page');
-    }
-  }, [token]);
+    const verifyAuth = async () => {
+      try {
+        const authenticated = await isAuthenticated();
+        setIsAuthed(authenticated);
+        if (!authenticated) {
+          navigate('/login', { state: { from: location } });
+        }
+      } catch (error) {
+        console.error('Auth verification failed:', error);
+        navigate('/login', { state: { from: location } });
+      } finally {
+        setIsVerifying(false);
+      }
+    };
 
-  if (!token) {
-    // Save attempted location to redirect back after login
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    verifyAuth();
+  }, [navigate, location]);
+
+  if (isVerifying) {
+    return <div>Loading...</div>;
   }
 
-  return <>{children}</>;
+  return isAuthed ? <>{children}</> : null;
 };
 
 export default ProtectedRoute;

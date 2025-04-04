@@ -70,7 +70,13 @@ const Navbar = () => {
             label="Search" 
             isActive={isActive('/search')} 
           />
-          {currentUser?.is_superuser || currentUser?.is_admin && (
+          <NavItem 
+            to="/account" 
+            icon={<UserRoundCog className="h-5 w-5" />} 
+            label="My Account" 
+            isActive={isActive('/account')} 
+          />
+          {(currentUser?.is_superuser || currentUser?.is_admin) && (
             <NavItem 
               to="/authors" 
               icon={<UserRoundMinus className="h-5 w-5" />} 
@@ -78,12 +84,6 @@ const Navbar = () => {
               isActive={isActive('/authors')} 
             />
           )}
-          <NavItem 
-            to="/account" 
-            icon={<UserRoundCog className="h-5 w-5" />} 
-            label="My Account" 
-            isActive={isActive('/account')} 
-          />
           {currentUser?.is_superuser && (
             <NavItem 
               to="/users" 

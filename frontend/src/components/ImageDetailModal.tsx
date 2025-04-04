@@ -4,7 +4,7 @@ import Button from './Button';
 import TagInput from './TagInput';
 import AuthorInput from './AuthorInput';
 import { formatFileSize } from '@/lib/utils';
-import { getPreviewUrl, updateImageMetadata, updateImageTags, getActualImage } from '@/utils/api';
+import { updateImageMetadata, updateImageTags, imageUrls } from '@/utils/api';
 import type { ImageMetadata } from '@/utils/api';
 import { toast } from 'sonner';
 
@@ -13,6 +13,7 @@ interface ImageDetailModalProps {
   onClose: () => void;
   onDelete: () => void;
   onUpdate: (updatedImage: ImageMetadata) => void;
+  isAdmin?: boolean;
 }
 
 const ImageDetailModal: React.FC<ImageDetailModalProps> = ({
@@ -20,6 +21,7 @@ const ImageDetailModal: React.FC<ImageDetailModalProps> = ({
   onClose,
   onDelete,
   onUpdate,
+  isAdmin = false
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editTags, setEditTags] = useState<string[]>(image.tags);
@@ -27,7 +29,7 @@ const ImageDetailModal: React.FC<ImageDetailModalProps> = ({
 
   const handleDownload = async () => {
     try {
-      const response = await fetch(getActualImage(image.id));
+      const response = await fetch(imageUrls.getActual(image.id));
       if (!response.ok) throw new Error('Download failed');
       
       const blob = await response.blob();
@@ -112,7 +114,7 @@ const ImageDetailModal: React.FC<ImageDetailModalProps> = ({
               {/* Image Preview */}
               <div className={styles.imageSection}>
                 <img
-                  src={getPreviewUrl(image.id, 'preview')}
+                  src={imageUrls.getPreview(image.id, 'preview')}
                   alt={`Image ${image.id}`}
                   className={styles.image}
                 />
@@ -247,14 +249,16 @@ const ImageDetailModal: React.FC<ImageDetailModalProps> = ({
                     <Download className="h-4 w-4" />
                     Download
                   </Button>
-                  <Button
-                    variant="destructive"
-                    onClick={onDelete}
-                    className="flex items-center gap-2"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Delete
-                  </Button>
+                  {isAdmin && (
+                    <Button
+                      variant="destructive"
+                      onClick={onDelete}
+                      className="flex items-center gap-2"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Delete
+                    </Button>
+                  )}
                 </>
               )}
               <Button variant="outline" onClick={onClose}>
