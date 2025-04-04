@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search as SearchIcon, Tag, Filter, X, HelpCircle, User, Download, Trash2 } from 'lucide-react';
+import { Search as Tag, Filter, HelpCircle, User } from 'lucide-react';
 import { toast } from 'sonner';
 import TransitionWrapper from '@/components/TransitionWrapper';
 import Button from '@/components/Button';
@@ -7,13 +7,9 @@ import Navbar from '@/components/Navbar';
 import ImageCard from '@/components/ImageCard';
 import TagInput from '@/components/TagInput';
 import AuthorInput from '@/components/AuthorInput';
-import { formatFileSize } from '@/lib/utils';
 import { 
   searchImages, 
-  getPreviewUrl, 
-  getActualImage, 
-  updateImageMetadata, 
-  updateImageTags,
+  imageUrls, 
   deleteImage,
   getCurrentUser
 } from '@/utils/api';
@@ -237,7 +233,7 @@ const ImageSearch = () => {
               {images.map((image) => (
                 <ImageCard
                   key={image.id}
-                  src={getPreviewUrl(image.id, 'search')}
+                  src={imageUrls.getPreview(image.id, 'search')}
                   alt={`Image ${image.id}`}
                   tags={image.tags}
                   author={image.author}

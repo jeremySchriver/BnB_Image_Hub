@@ -4,7 +4,7 @@ import Button from './Button';
 import TagInput from './TagInput';
 import AuthorInput from './AuthorInput';
 import { formatFileSize } from '@/lib/utils';
-import { getPreviewUrl, updateImageMetadata, updateImageTags, getActualImage } from '@/utils/api';
+import { updateImageMetadata, updateImageTags, imageUrls } from '@/utils/api';
 import type { ImageMetadata } from '@/utils/api';
 import { toast } from 'sonner';
 
@@ -29,7 +29,7 @@ const ImageDetailModal: React.FC<ImageDetailModalProps> = ({
 
   const handleDownload = async () => {
     try {
-      const response = await fetch(getActualImage(image.id));
+      const response = await fetch(imageUrls.getActual(image.id));
       if (!response.ok) throw new Error('Download failed');
       
       const blob = await response.blob();
@@ -114,7 +114,7 @@ const ImageDetailModal: React.FC<ImageDetailModalProps> = ({
               {/* Image Preview */}
               <div className={styles.imageSection}>
                 <img
-                  src={getPreviewUrl(image.id, 'preview')}
+                  src={imageUrls.getPreview(image.id, 'preview')}
                   alt={`Image ${image.id}`}
                   className={styles.image}
                 />

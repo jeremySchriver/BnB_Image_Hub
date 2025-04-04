@@ -58,8 +58,93 @@ interface SearchFilters {
   author?: string;
 }
 
+interface TagResponse {
+  name: string;
+}
+
+interface AdminStatusResponse {
+  message: string;
+  success: boolean;
+}
+
+interface PreviewOptions {
+  maxSize?: number;
+  size?: 'preview' | 'search';
+}
+
+interface RefreshResponse {
+  access_token: string;
+}
+
+interface LogoutResponse {
+  message: string;
+}
+
 // =============================================================================
-// Authentication & User Management
+// API Client Setup
+// =============================================================================
+
+export const createAPIClient = () => {
+  const baseRequest = async (url: string, options: RequestInit = {}) => {
+      try {
+          const response = await fetchWithRefresh(url, {
+              ...options,
+              credentials: 'include',
+              headers: {
+                  'Content-Type': 'application/json',
+                  ...options.headers,
+              }
+          });
+          
+          if (!response.ok) {
+              const error = await response.json().catch(() => null);
+              throw new Error(error?.detail || `HTTP error! status: ${response.status}`);
+          }
+          
+          return response;
+      } catch (error) {
+          throw error;
+      }
+  };
+
+  return {
+      get: async <T>(url: string) => {
+          const response = await baseRequest(url);
+          return response.json() as Promise<T>;
+      },
+      
+      post: async <T>(url: string, data?: any) => {
+          const response = await baseRequest(url, {
+              method: 'POST',
+              body: data instanceof FormData ? data : JSON.stringify(data),
+              headers: data instanceof FormData ? {} : { 'Content-Type': 'application/json' }
+          });
+          return response.json() as Promise<T>;
+      },
+      
+      put: async <T>(url: string, data: any) => {
+          const response = await baseRequest(url, {
+              method: 'PUT',
+              body: JSON.stringify(data)
+          });
+          return response.json() as Promise<T>;
+      },
+      
+      delete: async <T>(url: string) => {
+          const response = await baseRequest(url, {
+              method: 'DELETE'
+          });
+          return response.status === 204 ? undefined : response.json() as Promise<T>;
+      }
+  };
+};
+
+// Create a singleton instance
+export const apiClient = createAPIClient();
+
+
+// =============================================================================
+// Authentication
 // =============================================================================
 
 export const login = async (username: string, password: string): Promise<void> => {
@@ -97,29 +182,66 @@ export const logout = async (): Promise<void> => {
   window.location.href = '/login';
 };
 
+async function refreshAccessToken() {
+  try {
+    const response = await fetch(`${BASE_URL}/auth/refresh`, {
+      method: 'POST',
+      credentials: 'include',
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to refresh token');
+    }
+    
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+// Add axios interceptor or fetch wrapper
+export async function fetchWithRefresh(url: string, options: RequestInit = {}) {
+  let response = await fetch(url, { ...options, credentials: 'include' });
+  
+  if (response.status === 401) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) {
+      // Retry original request
+      response = await fetch(url, { ...options, credentials: 'include' });
+    } else {
+      // Redirect to login if refresh fails
+      window.location.href = '/login';
+    }
+  }
+  
+  return response;
+}
+
+// Check if user is authenticated
+export const isAuthenticated = async (): Promise<boolean> => {
+  return apiClient.get(`${BASE_URL}/auth/me`)
+};
+
+// =============================================================================
+// User Management
+// =============================================================================
+
 // Get current user profile
 export const getCurrentUser = async (): Promise<User> => {
-  try {
-    const response = await fetch(`${BASE_URL}/auth/me`, {
-      method: 'GET',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
+    return apiClient.get(`${BASE_URL}/auth/me`);
+};
 
-    if (!response.ok) {
-      if (response.status === 401) {
-        window.location.href = '/login';
-        throw new Error('Session expired. Please login again.');
-      }
-      throw new Error(`Failed to fetch user data (${response.status})`);
-    }
+export const getAllUsers = async (): Promise<User[]> => {
+  return apiClient.get(`${BASE_URL}/users/all`);
+};
 
-    return await response.json();
-  } catch (error) {
-    throw error;
-  }
+// Create user profile
+export const createUser = async (userData: { 
+  email: string; 
+  username: string; 
+  password: string; 
+}): Promise<User> => {
+  return apiClient.post<User>(`${BASE_URL}/users`, userData);
 };
 
 // Update user profile
@@ -129,247 +251,83 @@ export const updateUserProfile = async (userData: {
   password?: string;
   currentPassword?: string;
 }): Promise<User> => {
-  try {
-    const response = await fetch(`${BASE_URL}/users/me`, {
-      method: 'PUT',
-      credentials: 'include', // Important for sending cookies
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(userData)
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || 'Failed to update profile');
-    }
-
-    return await response.json();
-  } catch (error) {
-    if (error instanceof Error) {
-      throw error;
-    }
-    throw new Error('Failed to update profile');
-  }
+  return apiClient.put<User>(`${BASE_URL}/users/me`, userData);
 };
 
-export const setUserAdminStatus = async (email: string, isAdmin: boolean) => {
-  const response = await fetch(`${BASE_URL}/users/${email}/admin`, {
-    method: isAdmin ? 'POST' : 'DELETE',
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json'
-    }
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.detail || 'Failed to update admin status');
-  }
-
-  return response.json();
-};
-
-export const getAllUsers = async (): Promise<User[]> => {
-  const response = await fetch(`${BASE_URL}/users/all`, {
-    method: 'GET',
-    credentials: 'include',
-    headers: {
-      'Accept': 'application/json',
-      'Content-Type': 'application/json'
-    }
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    console.error('API Error:', errorData);
-    if (response.status === 401) {
-      throw new Error('Session expired. Please sign in again.');
-    }
-    throw new Error(errorData.detail || 'Failed to fetch users');
-  }
-
-  return response.json();
+export const setUserAdminStatus = async (email: string, isAdmin: boolean): Promise<AdminStatusResponse> => {
+  const method = isAdmin ? 'post' : 'delete';
+  return apiClient[method]<AdminStatusResponse>(`${BASE_URL}/users/${email}/admin`);
 };
 
 export const deleteUser = async (email: string): Promise<void> => {
-  const response = await fetch(`${BASE_URL}/users/${email}`, {
-    method: 'DELETE',
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json'
-    }
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.detail || 'Failed to delete user');
-  }
-
-  return response.json();
+  return apiClient.delete(`${BASE_URL}/users/${email}`);
 };
-
-export const createUser = async (userData: { 
-  email: string; 
-  username: string; 
-  password: string; 
-}): Promise<User> => {
-  const response = await fetch(`${BASE_URL}/users`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(userData)
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.detail || 'Failed to create user');
-  }
-
-  return response.json();
-};
-
-// =============================================================================
-// Authentication Helpers
-// =============================================================================
-
-// Get the authentication token
-export const getToken = (): string | null => {
-  return localStorage.getItem('auth_token');
-};
-
-export const getAuthToken = (): string | null => {
-  return localStorage.getItem('auth_token');
-};
-
-// Check if user is authenticated
-export const isAuthenticated = async (): Promise<boolean> => {
-  try {
-    const response = await fetch(`${BASE_URL}/auth/me`, {
-      method: 'GET',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-    return response.ok;
-  } catch {
-    return false;
-  }
-};
-
-// Add auth header to requests
-export const authHeader = () => ({
-  'Content-Type': 'application/json'
-});
 
 // =============================================================================
 // Image Management
 // =============================================================================
 
-// Image upload functions
+export const getImageById = async (imageId: number): Promise<ImageMetadata> => {
+  return apiClient.get(`${BASE_URL}/images/search/${imageId}`);
+};
+
+// Image upload function
 export const uploadImages = async (files: File[]): Promise<{ 
   success: boolean, 
   message: string, 
   failed?: string[] 
 }> => {
   const formData = new FormData();
-  
   files.forEach(file => {
-    formData.append('files', file);
+      formData.append('files', file);
   });
   
-  const response = await fetch(`${BASE_URL}/images/upload/batch`, {
-    method: 'POST',
-    headers: {
-      ...authHeader()
-    },
-    body: formData
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.detail || 'Failed to upload images');
-  }
-
-  return response.json();
-};
-
-export const getImageById = async (imageId: number): Promise<ImageMetadata> => {
-  const response = await fetch(`${BASE_URL}/images/search/${imageId}`);
-  if (!response.ok) {
-    throw new Error('Failed to fetch image');
-  }
-  return response.json();
+  return apiClient.post(`${BASE_URL}/images/upload/batch`, formData);
 };
 
 export const updateImageMetadata = async (
   imageId: number,
   updateData: UpdateImageTagsData
 ): Promise<ImageMetadata> => {
-  const response = await fetch(`${BASE_URL}/images/metadata/${imageId}`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      ...authHeader()
-    },
-    body: JSON.stringify(updateData)
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.detail || 'Failed to update image metadata');
-  }
-
-  return response.json();
+  return apiClient.put<ImageMetadata>(
+    `${BASE_URL}/images/metadata/${imageId}`,
+    updateData
+  );
 };
 
 export const deleteImage = async (imageId: string | number): Promise<void> => {
-  const url = `${BASE_URL}/images/images/${imageId}`;
-  
-  const response = await fetch(url, {
-    method: 'DELETE',
-    headers: {
-      ...authHeader()
-    }
-  });
-
-  if (!response.ok) {
-    if (response.status === 403) {
-      throw new Error('You do not have permission to delete images');
-    }
-    const error = await response.text();
-    throw new Error(`Failed to delete image: ${error}`);
-  }
+  return apiClient.delete(`${BASE_URL}/images/images/${imageId}`);
 };
 
 // =============================================================================
 // Image URLs & Previews
 // =============================================================================
 
-// Get image URL
-export const getImageUrl = (imageId: string): string => {
-  return `${BASE_URL}/images/${imageId}/content`;
+export const imageUrls = {
+  // Get full image content
+  getContent: (imageId: string | number): string => 
+    `${BASE_URL}/images/${imageId}/content`,
+
+  // Get untagged image
+  getUntagged: (image: ImageMetadata): string => 
+    `${BASE_URL}${image.untagged_full_path}`,
+
+  // Get preview for untagged image
+  getUntaggedPreview: (imageId: string | number, maxSize: number = 800): string => 
+    `${BASE_URL}/preview/untagged/preview/${imageId}?max_size=${maxSize}`,
+
+  // Get preview based on size type
+  getPreview: (imageId: string | number, size: 'preview' | 'search'): string => 
+    `${BASE_URL}/images/preview/${size}/${imageId}`,
+
+  // Get actual full-resolution image
+  getActual: (imageId: string | number): string => 
+    `${BASE_URL}/images/content/${imageId}`
 };
 
-// Get image URL
-export const getUntaggedImageUrl = (image: ImageMetadata): string => {
-  // Use the URL provided by the API
-  return `${BASE_URL}${image.untagged_full_path}`;
-};
-
-export const getUntaggedPreviewUrl = (imageId: string, maxSize: number = 800): string => {
-  return `${BASE_URL}/preview/untagged/preview/${imageId}?max_size=${maxSize}`;
-};
-
-export const getPreviewUrl = (imageId: string, size: 'preview' | 'search'): string => {
-  return `${BASE_URL}/images/preview/${size}/${imageId}`;
-};
-
-export const getActualImage = (imageId: string): string => {
-  return `${BASE_URL}/images/content/${imageId}`;
+// Create a method to fetch preview metadata if needed
+export const fetchPreviewMetadata = async (imageId: string | number): Promise<ImageMetadata> => {
+  return apiClient.get<ImageMetadata>(`${BASE_URL}/images/preview/metadata/${imageId}`);
 };
 
 // =============================================================================
@@ -387,34 +345,16 @@ export const searchImages = async (filters: SearchFilters): Promise<ImageMetadat
     params.append('author', filters.author);
   }
   
-  const response = await fetch(`${BASE_URL}/images/search?${params.toString()}`, {
-    headers: {
-      ...authHeader()
-    }
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to search images');
-  }
-  
-  return response.json();
+  return apiClient.get(`${BASE_URL}/images/search?${params.toString()}`)
 };
 
 // Get untagged images
 export const getUntaggedImages = async (limit: number = 10): Promise<ImageMetadata[]> => {
-  const response = await fetch(`/images/untagged?limit=${limit}`);
-  if (!response.ok) {
-    throw new Error('Failed to fetch untagged images');
-  }
-  return response.json();
+  return apiClient.get(`${BASE_URL}/images/untagged?limit=${limit}`);
 };
 
 export const getNextUntaggedImage = async (): Promise<ImageMetadata[]> => {
-  const response = await fetch(`${BASE_URL}/images/untagged/next`);
-  if (!response.ok) {
-    throw new Error('Failed to fetch untagged images');
-  }
-  return response.json();
+  return apiClient.get(`${BASE_URL}/images/untagged/next`);
 };
 
 // Update image tags
@@ -422,30 +362,15 @@ export const updateImageTags = async (
   imageId: number,
   updateData: UpdateImageTagsData
 ): Promise<ImageMetadata> => {
-  const response = await fetch(`${BASE_URL}/images/tags/${imageId}`, {
-      method: 'PUT',
-      headers: {
-          'Content-Type': 'application/json',
-          ...authHeader()
-      },
-      body: JSON.stringify(updateData)
-  });
-
-  if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || 'Failed to update image tags');
-  }
-
-  return response.json();
+  return apiClient.put<ImageMetadata>(
+    `${BASE_URL}/images/tags/${imageId}`,
+    updateData
+  );
 };
 
 export const searchTags = async (query: string): Promise<string[]> => {
-  const response = await fetch(`${BASE_URL}/tags/search?query=${encodeURIComponent(query)}`);
-  if (!response.ok) {
-    throw new Error('Failed to fetch tag suggestions');
-  }
-  const tags = await response.json();
-  return tags.map((tag: { name: string }) => tag.name);
+  const tags = await apiClient.get<TagResponse[]>(`${BASE_URL}/tags/search?query=${encodeURIComponent(query)}`);
+  return tags.map(tag => tag.name);
 };
 
 // =============================================================================
@@ -453,95 +378,31 @@ export const searchTags = async (query: string): Promise<string[]> => {
 // =============================================================================
 
 export const getAuthorsData = async (): Promise<Author[]> => {
-  const response = await fetch(`${BASE_URL}/authors/`);
-  return response.json();
+  return apiClient.get(`${BASE_URL}/authors/`);
 };
 
 export const getAuthorById = async (author_id: number): Promise<Author> => {
-  const response = await fetch(`${BASE_URL}/authors/${author_id}`);
-  return response.json();
+  return apiClient.get(`${BASE_URL}/authors/${author_id}`);
 };
 
 export const searchAuthors = async (query: string): Promise<Author[]> => {
-  const response = await fetch(`${BASE_URL}/authors/search?query=${encodeURIComponent(query)}`);
-  if (!response.ok) {
-    throw new Error('Failed to fetch author suggestions');
-  }
-  return response.json();
+  return apiClient.get(`${BASE_URL}/authors/search?query=${encodeURIComponent(query)}`);
 };
 
 export const updateAuthorData = async (
   author_id: number,
   updateData: Author
 ): Promise<Author> => {
-  const response = await fetch(`${BASE_URL}/authors/${author_id}`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      ...authHeader()
-    },
-    body: JSON.stringify(updateData)
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.detail || 'Failed to update image metadata');
-  }
-
-  return response.json();
+  return apiClient.put<Author>(
+    `${BASE_URL}/authors/${author_id}`,
+    updateData
+  );
 };
 
 export const createAuthor = async (author: Author): Promise<Author> => {
-  const response = await fetch(`${BASE_URL}/authors/`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...authHeader()
-    },
-    body: JSON.stringify(author)
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.detail || 'Failed to create author');
-  }
-
-  return response.json();
+  return apiClient.post<Author>(`${BASE_URL}/authors`, author);
 }
 
 export const deleteAuthorData = async (author_id: number): Promise<void> => {
-  const response = await fetch(`${BASE_URL}/authors/${author_id}`, {
-    method: 'DELETE',
-    headers: {
-      ...authHeader()
-    }
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Failed to delete author: ${error}`);
-  }
-};
-
-// =============================================================================
-// Error Handling
-// =============================================================================
-
-// Helper for handling HTTP errors
-const handleResponse = async (response: Response) => {
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || `API Error: ${response.status}`);
-  }
-  
-  return response.json();
-};
-
-const handleApiError = (error: any) => {
-  if (error.response?.status === 401) {
-    // Unauthorized - clear token and redirect to login
-    logout();
-    throw new Error('Session expired. Please sign in again.');
-  }
-  throw error;
+  return apiClient.delete(`${BASE_URL}/authors/${author_id}`);
 };

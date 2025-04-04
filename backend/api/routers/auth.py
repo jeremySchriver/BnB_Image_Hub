@@ -29,6 +29,12 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
 
+def create_refresh_token(data: dict):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(hours=12)
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
 def verify_jwt_token(token: str) -> dict:
     """
     Verify and decode a JWT token
@@ -59,13 +65,9 @@ async def get_current_user(auth_token: str = Cookie(None), db: Session = Depends
             detail="Not authenticated"
         )
     
-    try:
-        # Debug logging (optional)
-        print(f"Debug - Received auth token: {auth_token[:20]}...")
-        
+    try:        
         # Verify and decode the token
         payload = verify_jwt_token(auth_token)
-        print(f"Debug - JWT payload: {payload}")
         
         # Get user from database
         user = get_user_by_id(db, int(payload['sub']))
@@ -74,18 +76,14 @@ async def get_current_user(auth_token: str = Cookie(None), db: Session = Depends
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="User not found"
             )
-            
-        print(f"Debug - Found user: {user.email}")
         return user
         
     except JWTError as e:
-        print(f"Debug - JWT Error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Invalid authentication token: {str(e)}"
+            detail="Invalid authentication token"
         )
     except Exception as e:
-        print(f"Debug - Unexpected error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error during authentication"
@@ -133,16 +131,26 @@ async def login_for_access_token(
         )
 
     access_token = create_access_token(data={"sub": str(user.id)})
+    refresh_token = create_refresh_token(data={"sub": str(user.id)})
     
-    # Set strict cookie settings
     response.set_cookie(
         key="auth_token",
-        value=f"{access_token}",  # Ensure token is a string
+        value=access_token,
         httponly=True,
-        secure=False,  # False for development, True for production
+        secure=False,  # Set to True in production
         samesite="lax",
-        max_age=60 * 60 * 24,  # 24 hours
+        max_age=60 * 60,  # 1 hour
         path="/"
+    )
+    
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=False,  # Set to True in production
+        samesite="lax",
+        max_age=60 * 60 * 24 * 30,  # 30 days
+        path="/auth/refresh"
     )
     
     return {
@@ -166,3 +174,44 @@ async def logout(response: Response):
 async def get_current_auth_user(current_user: User = Depends(get_current_user)):
     """Get current authenticated user."""
     return current_user
+
+@router.post("/refresh")
+async def refresh_token(
+    response: Response,
+    refresh_token: str = Cookie(None),
+    db: Session = Depends(get_db)
+):
+    if not refresh_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="No refresh token"
+        )
+    
+    try:
+        payload = verify_jwt_token(refresh_token)
+        user = get_user_by_id(db, int(payload['sub']))
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User not found"
+            )
+            
+        access_token = create_access_token(data={"sub": str(user.id)})
+        
+        response.set_cookie(
+            key="auth_token",
+            value=access_token,
+            httponly=True,
+            secure=False,  # Set to True in production
+            samesite="lax",
+            max_age=60 * 60,  # 1 hour
+            path="/"
+        )
+        
+        return {"access_token": access_token}
+        
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token"
+        )

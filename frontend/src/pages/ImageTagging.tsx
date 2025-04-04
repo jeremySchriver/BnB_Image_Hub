@@ -8,7 +8,7 @@ import TagInput from '@/components/TagInput';
 import { updateImageTags, getNextUntaggedImage } from '@/utils/api';
 import type { ImageMetadata } from '@/utils/api';
 import AuthorInput from '@/components/AuthorInput';
-import { getPreviewUrl } from '@/utils/api';
+import { imageUrls } from '@/utils/api';
 
 
 const ImageTagging = () => {
@@ -108,7 +108,7 @@ const ImageTagging = () => {
             {/* Image preview */}
             <div className="h-[calc(100vh-280px)] flex items-center justify-center bg-secondary/30">
               <img
-                src={getPreviewUrl(currentImage.id, 'preview')}
+                src={imageUrls.getPreview(currentImage.id, 'preview')}
                 alt={currentImage.filename}
                 className="max-h-full max-w-full object-contain rounded-lg"
                 loading="lazy"
