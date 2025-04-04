@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from typing import List
 from fastapi.responses import JSONResponse
@@ -11,12 +11,11 @@ from backend.database.services.user_service import (
     get_user_by_username,
     get_user_by_email,
     update_user,
-    get_current_user,
     verify_password,
     add_admin_flag,
     remove_admim_flag
 )
-from backend.api.auth import get_current_user
+from backend.api.routers.auth import get_current_user
 
 router = APIRouter(
     prefix="/users",
@@ -150,8 +149,8 @@ def update_user_info(
 # Read all users. Only accessible by superusers.
 @router.get("/all", response_model=List[UserResponse])
 async def get_all_users(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """Get all users. Only accessible by superusers."""
     if not current_user.is_superuser:
@@ -160,14 +159,8 @@ async def get_all_users(
             detail="Only superusers can view all users"
         )
     
-    try:
-        users = db.query(User).all()
-        return users
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
+    users = db.query(User).all()
+    return users
 
 # Endpoint to get the current authenticated user's information
 @router.get("/me", response_model=UserResponse)

@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { UserCog, Save } from 'lucide-react';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 import TransitionWrapper from '@/components/TransitionWrapper';
 import Button from '@/components/Button';
 import Navbar from '@/components/Navbar';
 import { Input } from "@/components/ui/input";
 import { getCurrentUser, updateUserProfile } from '@/utils/api';
+import type { User } from '@/utils/types';
 
 interface AccountForm {
   email: string;
@@ -15,13 +17,9 @@ interface AccountForm {
   confirmPassword: string;
 }
 
-interface UserData {
-  email: string;
-  username: string;
-  id: number;
-}
-
 const AccountManagement = () => {
+  const navigate = useNavigate();
+  const [userData, setUserData] = useState<User | null>(null);
   const [formData, setFormData] = useState<AccountForm>({
     email: '',
     username: '',
@@ -29,36 +27,31 @@ const AccountManagement = () => {
     newPassword: '',
     confirmPassword: ''
   });
-  const [isLoading, setIsLoading] = useState(false);
-  const [userData, setUserData] = useState<UserData | null>(null);
-
+  const [isLoading, setIsLoading] = useState(true);
+  
   useEffect(() => {
     fetchUserData();
   }, []);
 
   const fetchUserData = async () => {
-    setIsLoading(true);
     try {
-      const token = localStorage.getItem('auth_token');
-      if (!token) {
-        throw new Error('No authentication token found');
+      const user = await getCurrentUser();
+      if (!user) {
+        throw new Error('No user data found');
       }
-  
-      const receivedUserData = await getCurrentUser();
       
-      // Store the user data
-      setUserData(receivedUserData);
-      
+      setUserData(user);
       setFormData(prev => ({
         ...prev,
-        email: receivedUserData.email || '',
-        username: receivedUserData.username || '',
+        email: user.email,
+        username: user.username,
         currentPassword: '',
         newPassword: '',
         confirmPassword: ''
       }));
     } catch (error) {
-      // ...existing error handling...
+      toast.error('Failed to load user data');
+      navigate('/login');
     } finally {
       setIsLoading(false);
     }
@@ -71,31 +64,30 @@ const AccountManagement = () => {
     try {
       const updateData: any = {};
   
-      // Handle profile updates (email/username)
-      if (formData.email && userData && formData.email !== userData.email) {
-        updateData.email = formData.email;
-      }
-      if (formData.username && userData && formData.username !== userData.username) {
-        updateData.username = formData.username;
+      // Only include changed fields
+      if (userData) {
+        if (formData.email !== userData.email) {
+          updateData.email = formData.email;
+        }
+        if (formData.username !== userData.username) {
+          updateData.username = formData.username;
+        }
       }
   
       // Handle password update
       if (formData.newPassword || formData.currentPassword) {
         if (!formData.currentPassword) {
           toast.error("Current password is required to change password");
-          setIsLoading(false);
           return;
         }
   
         if (!formData.newPassword) {
           toast.error("New password is required");
-          setIsLoading(false);
           return;
         }
   
         if (formData.newPassword !== formData.confirmPassword) {
           toast.error("New passwords don't match");
-          setIsLoading(false);
           return;
         }
   
@@ -105,27 +97,35 @@ const AccountManagement = () => {
   
       if (Object.keys(updateData).length === 0) {
         toast.error("No changes to update");
-        setIsLoading(false);
         return;
       }
   
       const updatedUser = await updateUserProfile(updateData);
       setUserData(updatedUser);
-      toast.success("Account updated successfully");
-  
-      // Clear password fields
+      
+      // Reset password fields but keep other data
       setFormData(prev => ({
         ...prev,
         currentPassword: '',
         newPassword: '',
         confirmPassword: ''
       }));
+      
+      toast.success("Account updated successfully");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to update account");
     } finally {
       setIsLoading(false);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen pb-16 sm:pb-0 sm:pt-16 bg-background">
@@ -200,9 +200,9 @@ const AccountManagement = () => {
               </div>
             </div>
 
-            <Button type="submit" className="w-full">
+            <Button type="submit" disabled={isLoading} className="w-full">
               <Save className="h-4 w-4 mr-2" />
-              Save Changes
+              {isLoading ? 'Saving...' : 'Save Changes'}
             </Button>
           </form>
         </div>

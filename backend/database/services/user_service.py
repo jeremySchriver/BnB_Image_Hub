@@ -124,6 +124,3 @@ def remove_admim_flag(db: Session, email: str) -> User:
     db.commit()
     db.refresh(user)
     return user
-
-def get_current_user(db: Session, user_id: int) -> User:
-    return get_user_by_id(db, user_id)

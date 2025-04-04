@@ -22,14 +22,9 @@ const Login = () => {
     setIsLoading(true);
     
     try {
-      const response = await login(email, password);
-      if (response.access_token) {
-        localStorage.setItem('auth_token', response.access_token);
-        toast.success('Login successful');
-        navigate('/upload');
-      } else {
-        throw new Error('Invalid response from server');
-      }
+      await login(email, password);
+      toast.success('Login successful');
+      navigate('/upload');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Login failed. Please try again.');
     } finally {

@@ -21,7 +21,7 @@ from backend.database.services.image_service import (
 )
 from backend.config import TAG_PREVIEW_DIR, SEARCH_PREVIEW_DIR, UNTAGGED_DIR
 from backend.processor.thumbnail_generator import generate_previews
-from backend.api.auth import get_current_user
+from backend.api.routers.auth import get_current_user
 
 # Configure logging
 logger = logging.getLogger(__name__)

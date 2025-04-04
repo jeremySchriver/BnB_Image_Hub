@@ -62,64 +62,58 @@ interface SearchFilters {
 // Authentication & User Management
 // =============================================================================
 
-export const login = async (email: string, password: string): Promise<LoginResponse> => {
-  try {
-    const response = await fetch(`${BASE_URL}/auth/token`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: new URLSearchParams({
-        username: email, // FastAPI OAuth2 expects 'username' even for email
-        password: password,
-        grant_type: 'password'
-      })
-    });
+export const login = async (username: string, password: string): Promise<void> => {
+  const formData = new URLSearchParams();
+  formData.append('username', username);
+  formData.append('password', password);
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || 'Login failed');
-    }
+  const response = await fetch(`${BASE_URL}/auth/login`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    credentials: 'include',
+    body: formData
+  });
 
-    return response.json();
-  } catch (error) {
-    if (error instanceof Error) {
-      throw new Error(error.message);
-    }
-    throw new Error('Login failed. Please check your credentials.');
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Invalid credentials');
   }
+
+  // The backend will set the cookie
+  await response.json();
 };
 
-export const logout = (): void => {
-  localStorage.removeItem('auth_token');
+export const logout = async (): Promise<void> => {
+  try {
+    await fetch(`${BASE_URL}/auth/logout`, {
+      method: 'POST',
+      credentials: 'include'
+    });
+  } catch (error) {
+    console.error('Logout failed:', error);
+  }
   window.location.href = '/login';
 };
 
 // Get current user profile
 export const getCurrentUser = async (): Promise<User> => {
-  const token = localStorage.getItem('auth_token');
-  if (!token) {
-    throw new Error('No authentication token found');
-  }
-
   try {
     const response = await fetch(`${BASE_URL}/auth/me`, {
       method: 'GET',
+      credentials: 'include',
       headers: {
-        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       }
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
       if (response.status === 401) {
-        // Clear token and redirect to login if unauthorized
-        localStorage.removeItem('auth_token');
         window.location.href = '/login';
         throw new Error('Session expired. Please login again.');
       }
-      throw new Error(errorData.detail || `Failed to fetch user data (${response.status})`);
+      throw new Error(`Failed to fetch user data (${response.status})`);
     }
 
     return await response.json();
@@ -158,71 +152,59 @@ export const updateUserProfile = async (userData: {
 };
 
 export const setUserAdminStatus = async (email: string, isAdmin: boolean) => {
-  const token = localStorage.getItem('auth_token');
-  if (!token) throw new Error('No authentication token found');
-
-  const response = await fetch(
-    `${BASE_URL}/users/${email}/admin`,
-    {
-      method: isAdmin ? 'POST' : 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
+  const response = await fetch(`${BASE_URL}/users/${email}/admin`, {
+    method: isAdmin ? 'POST' : 'DELETE',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json'
     }
-  );
+  });
 
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.detail || 'Failed to update admin status');
   }
 
-  return await response.json();
+  return response.json();
 };
 
 export const getAllUsers = async (): Promise<User[]> => {
-  const token = localStorage.getItem('auth_token');
-  if (!token) throw new Error('No authentication token found');
-
-  const response = await fetch(
-    `${BASE_URL}/users/all`,
-    {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
+  const response = await fetch(`${BASE_URL}/users/all`, {
+    method: 'GET',
+    credentials: 'include',
+    headers: {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json'
     }
-  );
+  });
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.detail || 'Failed to fetch users');
+    const errorData = await response.json();
+    console.error('API Error:', errorData);
+    if (response.status === 401) {
+      throw new Error('Session expired. Please sign in again.');
+    }
+    throw new Error(errorData.detail || 'Failed to fetch users');
   }
 
-  return await response.json();
+  return response.json();
 };
 
 export const deleteUser = async (email: string): Promise<void> => {
-  const token = localStorage.getItem('auth_token');
-  if (!token) throw new Error('No authentication token found');
-
-  const response = await fetch(
-    `${BASE_URL}/users/${email}`,
-    {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
+  const response = await fetch(`${BASE_URL}/users/${email}`, {
+    method: 'DELETE',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json'
     }
-  );
+  });
 
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.detail || 'Failed to delete user');
   }
 
-  return await response.json();
+  return response.json();
 };
 
 export const createUser = async (userData: { 
@@ -232,9 +214,9 @@ export const createUser = async (userData: {
 }): Promise<User> => {
   const response = await fetch(`${BASE_URL}/users`, {
     method: 'POST',
+    credentials: 'include',
     headers: {
-      'Content-Type': 'application/json',
-      ...authHeader()
+      'Content-Type': 'application/json'
     },
     body: JSON.stringify(userData)
   });
@@ -261,24 +243,25 @@ export const getAuthToken = (): string | null => {
 };
 
 // Check if user is authenticated
-export const isAuthenticated = (): boolean => {
-  const token = localStorage.getItem('auth_token');
-  return !!token; // Returns true if token exists, false otherwise
+export const isAuthenticated = async (): Promise<boolean> => {
+  try {
+    const response = await fetch(`${BASE_URL}/auth/me`, {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
 };
 
 // Add auth header to requests
-export const authHeader = () => {
-  const token = localStorage.getItem('auth_token');
-  if (token) {
-    return {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    };
-  }
-  return {
-    'Content-Type': 'application/json'
-  };
-};
+export const authHeader = () => ({
+  'Content-Type': 'application/json'
+});
 
 // =============================================================================
 // Image Management

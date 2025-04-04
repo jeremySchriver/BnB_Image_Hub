@@ -7,7 +7,7 @@ from backend.database.models.user import User
 from backend.database.schemas.author import AuthorResponse, AuthorCreate, AuthorUpdate
 from backend.database.services.author_service import search_authors as search_authors_service, get_author_list, get_author_by_id, get_author_by_email, create_author, delete_email_by_id
 
-from backend.api.auth import get_current_user
+from backend.api.routers.auth import get_current_user
 
 # Configure logging
 logger = logging.getLogger(__name__)

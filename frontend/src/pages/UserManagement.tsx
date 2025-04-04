@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Users, Shield, ShieldOff, Trash2, UserRoundPlus } from 'lucide-react';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 import TransitionWrapper from '@/components/TransitionWrapper';
 import { Button } from "@/components/ui/button";
 import Navbar from '@/components/Navbar';
@@ -12,20 +13,35 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getAllUsers, setUserAdminStatus, deleteUser, createUser } from '@/utils/api';
+import { getAllUsers, setUserAdminStatus, deleteUser, createUser, getCurrentUser } from '@/utils/api';
 import type { User } from '@/utils/types';
 import DeleteUserConfirmationDialog from '@/components/DeleteUserConfirmationDialog';
 import AddUserDialog from '@/components/AddUserDialog';
 
 const UserManagement = () => {
+  const navigate = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
   const [showAddUser, setShowAddUser] = useState(false);
 
   useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const fetchedUsers = await getAllUsers();
+        setUsers(fetchedUsers);
+      } catch (error) {
+        if (error instanceof Error && error.message === 'Session expired. Please sign in again.') {
+          toast.error(error.message);
+          navigate('/login');
+        } else {
+          toast.error(error instanceof Error ? error.message : 'Failed to fetch users');
+        }
+      }
+    };
+
     fetchUsers();
-  }, []);
+  }, [navigate]);
 
   const fetchUsers = async () => {
     setIsLoading(true);
@@ -34,10 +50,8 @@ const UserManagement = () => {
       setUsers(data as User[]);
     } catch (error) {
       if (error instanceof Error && error.message.includes('401')) {
-        // Handle unauthorized error
         toast.error('Session expired. Please sign in again.');
-        localStorage.removeItem('auth_token');
-        window.location.href = '/login';
+        navigate('/login');
         return;
       }
       toast.error('Failed to fetch users');
@@ -82,19 +96,18 @@ const UserManagement = () => {
     try {
       await createUser(userData);
       toast.success('User created successfully');
-      await fetchUsers(); // Wait for this to complete
+      await fetchUsers();
       setShowAddUser(false);
     } catch (error) {
       if (error instanceof Error && error.message.includes('401')) {
-        // Handle unauthorized error
         toast.error('Session expired. Please sign in again.');
-        localStorage.removeItem('auth_token');
-        window.location.href = '/login';
+        navigate('/login');
         return;
       }
       toast.error(error instanceof Error ? error.message : 'Failed to create user');
     }
   };
+
   return (
     <div className="min-h-screen pb-16 sm:pb-0 sm:pt-16 bg-background">
       <Navbar />
