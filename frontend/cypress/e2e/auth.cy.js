@@ -27,4 +27,27 @@ describe('Authentication', () => {
       cy.get('button').contains('Log out').click()
       cy.url().should('include', '/login')
     })
+
+    it('Auth - Protected Route Redirect', () => {
+      // Attempt to access protected route without login
+      cy.visit('/upload')
+      cy.url().should('include', '/login')
+      
+      // Login and verify access
+      cy.login('cypress_test@bnb.com', 'cyp-test')
+      cy.visit('/upload')
+      cy.url().should('include', '/upload')
+    })
+
+    it('Auth - SU Protected Route Redirect', () => {
+      // Attempt to access protected route without login
+      cy.visit('/users')
+      cy.url().should('include', '/login')
+      
+      // Login and attempt access
+      cy.login('cypress_test@bnb.com', 'cyp-test')
+      cy.wait(1000)
+      cy.visit('/users')
+      cy.contains('You do not have permission to access this page').should('be.visible')
+    })
   })
