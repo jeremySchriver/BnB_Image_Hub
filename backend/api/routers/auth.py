@@ -1,7 +1,9 @@
 from datetime import datetime, timedelta
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Response, Cookie
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Cookie, Request
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 from typing import Optional
@@ -18,6 +20,9 @@ router = APIRouter(
 )
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+# Create a limiter instance
+limiter = Limiter(key_func=get_remote_address)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
@@ -118,46 +123,59 @@ async def login(
     return {"status": "success"}
 
 @router.post("/login")
+@limiter.limit("5/minute")  # Allow 5 login attempts per minute per IP
 async def login_for_access_token(
+    request: Request,
     response: Response,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
-    user = authenticate_user(db, form_data.username, form_data.password)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password"
-        )
+    try:
+        user = authenticate_user(db, form_data.username, form_data.password)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect username or password"
+            )
 
-    access_token = create_access_token(data={"sub": str(user.id)})
-    refresh_token = create_refresh_token(data={"sub": str(user.id)})
-    
-    response.set_cookie(
-        key="auth_token",
-        value=access_token,
-        httponly=True,
-        secure=False,  # Set to True in production
-        samesite="lax",
-        max_age=60 * 60,  # 1 hour
-        path="/"
-    )
-    
-    response.set_cookie(
-        key="refresh_token",
-        value=refresh_token,
-        httponly=True,
-        secure=False,  # Set to True in production
-        samesite="lax",
-        max_age=60 * 60 * 24 * 30,  # 30 days
-        path="/auth/refresh"
-    )
-    
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "is_superuser": user.is_superuser
-    }
+        access_token = create_access_token(data={"sub": str(user.id)})
+        refresh_token = create_refresh_token(data={"sub": str(user.id)})
+        
+        response.set_cookie(
+            key="auth_token",
+            value=access_token,
+            httponly=True,
+            secure=False,  # Set to True in production
+            samesite="lax",
+            max_age=60 * 60,  # 1 hour
+            path="/"
+        )
+        
+        response.set_cookie(
+            key="refresh_token",
+            value=refresh_token,
+            httponly=True,
+            secure=False,  # Set to True in production
+            samesite="lax",
+            max_age=60 * 60 * 24 * 30,  # 30 days
+            path="/auth/refresh"
+        )
+        
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "is_superuser": user.is_superuser
+        }
+    except Exception as e:
+        if isinstance(e, HTTPException) and e.status_code == 429:
+            # Rate limit exceeded
+            retry_after = 60
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Too many login attempts. Please try again in {retry_after} seconds.",
+                headers={"Retry-After": str(retry_after)}
+            )
+        raise e
 
 @router.post("/logout")
 async def logout(response: Response):

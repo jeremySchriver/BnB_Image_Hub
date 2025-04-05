@@ -198,7 +198,13 @@ export const login = async (username: string, password: string): Promise<void> =
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.detail || 'Invalid credentials');
+    if (response.status === 429) {
+      const retryAfter = response.headers.get('Retry-After') || '60';
+      throw new Error(`429: Too many attempts. Try again in ${retryAfter} seconds.`);
+    }
+    else {
+      throw new Error(error.detail || 'Invalid credentials');
+    }
   }
 
   const data = await response.json();
