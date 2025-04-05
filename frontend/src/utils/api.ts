@@ -1,4 +1,3 @@
-
 // API Connection Layer - Connects to FAST API instance
 
 const BASE_URL = 'http://localhost:8000';
@@ -84,64 +83,100 @@ interface LogoutResponse {
 // API Client Setup
 // =============================================================================
 
+// Replace the existing createAPIClient function
 export const createAPIClient = () => {
-  const baseRequest = async (url: string, options: RequestInit = {}) => {
+  let csrfToken: string | null = null;
+
+  const ensureCsrfToken = async () => {
+    if (!csrfToken) {
       try {
-          const response = await fetchWithRefresh(url, {
-              ...options,
-              credentials: 'include',
-              headers: {
-                  'Content-Type': 'application/json',
-                  ...options.headers,
-              }
-          });
-          
-          if (!response.ok) {
-              const error = await response.json().catch(() => null);
-              throw new Error(error?.detail || `HTTP error! status: ${response.status}`);
-          }
-          
-          return response;
+        const response = await fetch(`${BASE_URL}/auth/csrf-token`, {
+          credentials: 'include'
+        });
+        const data = await response.json();
+        csrfToken = data.csrf_token;
       } catch (error) {
-          throw error;
+        console.error('Failed to fetch CSRF token:', error);
       }
+    }
+    return csrfToken;
+  };
+
+  const baseRequest = async (url: string, options: RequestInit = {}, retryCount = 0) => {
+    try {
+      // Add CSRF token for mutating requests
+      if (options.method && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(options.method)) {
+        const token = await ensureCsrfToken();
+        options.headers = {
+          ...options.headers,
+          'X-CSRF-Token': token || ''
+        };
+      }
+  
+      const response = await fetchWithRefresh(url, {
+        ...options,
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...options.headers,
+        }
+      });
+  
+      // Handle CSRF failures with retry
+      if (response.status === 403 && retryCount < 1) {
+        csrfToken = null; // Clear invalid token
+        return baseRequest(url, options, retryCount + 1);
+      }
+  
+      if (!response.ok) {
+        const error = await response.json().catch(() => null);
+        throw new Error(error?.detail || `HTTP error! status: ${response.status}`);
+      }
+  
+      return response;
+    } catch (error) {
+      throw error;
+    }
   };
 
   return {
-      get: async <T>(url: string) => {
-          const response = await baseRequest(url);
-          return response.json() as Promise<T>;
-      },
-      
-      post: async <T>(url: string, data?: any) => {
-          const response = await baseRequest(url, {
-              method: 'POST',
-              body: data instanceof FormData ? data : JSON.stringify(data),
-              headers: data instanceof FormData ? {} : { 'Content-Type': 'application/json' }
-          });
-          return response.json() as Promise<T>;
-      },
-      
-      put: async <T>(url: string, data: any) => {
-          const response = await baseRequest(url, {
-              method: 'PUT',
-              body: JSON.stringify(data)
-          });
-          return response.json() as Promise<T>;
-      },
-      
-      delete: async <T>(url: string) => {
-          const response = await baseRequest(url, {
-              method: 'DELETE'
-          });
-          return response.status === 204 ? undefined : response.json() as Promise<T>;
-      }
+    get: async <T>(url: string) => {
+      const response = await baseRequest(url);
+      return response.json() as Promise<T>;
+    },
+
+    post: async <T>(url: string, data?: any) => {
+      const response = await baseRequest(url, {
+        method: 'POST',
+        body: data instanceof FormData ? data : JSON.stringify(data),
+        headers: data instanceof FormData ? {} : { 'Content-Type': 'application/json' }
+      });
+      return response.json() as Promise<T>;
+    },
+
+    put: async <T>(url: string, data: any) => {
+      const response = await baseRequest(url, {
+        method: 'PUT',
+        body: JSON.stringify(data)
+      });
+      return response.json() as Promise<T>;
+    },
+
+    delete: async <T>(url: string) => {
+      const response = await baseRequest(url, {
+        method: 'DELETE'
+      });
+      return response.status === 204 ? undefined : response.json() as Promise<T>;
+    },
+
+    clearCsrfToken: () => {
+      csrfToken = null;
+    }
   };
 };
 
 // Create a singleton instance
 export const apiClient = createAPIClient();
-
 
 // =============================================================================
 // Authentication
@@ -166,8 +201,10 @@ export const login = async (username: string, password: string): Promise<void> =
     throw new Error(error.detail || 'Invalid credentials');
   }
 
-  // The backend will set the cookie
-  await response.json();
+  const data = await response.json();
+  
+  // Force a refresh of the CSRF token after login
+  await apiClient.get(`${BASE_URL}/auth/csrf-token`);
 };
 
 export const logout = async (): Promise<void> => {
@@ -176,6 +213,8 @@ export const logout = async (): Promise<void> => {
       method: 'POST',
       credentials: 'include'
     });
+    // Clear CSRF token on logout
+    apiClient.clearCsrfToken();
   } catch (error) {
     console.error('Logout failed:', error);
   }
