@@ -1,8 +1,10 @@
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer
+from starlette.middleware.base import BaseHTTPMiddleware
 import secrets
 from typing import Optional
+from backend.config import settings, get_csp_header
 from backend.api.routers import images, users, tags, authors, preview_resize, auth
 
 app = FastAPI()
@@ -10,6 +12,20 @@ app = FastAPI()
 # Add to your existing code
 CSRF_TOKEN_LENGTH = 32
 csrf_tokens = set()
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        
+        # Security Headers
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        response.headers["Content-Security-Policy"] = get_csp_header()
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        
+        return response
 
 async def csrf_middleware(request: Request, call_next):
     # Skip CSRF check for safe methods and auth endpoints
@@ -36,6 +52,7 @@ async def csrf_middleware(request: Request, call_next):
     return response
 
 # Add middleware
+app.add_middleware(SecurityHeadersMiddleware)
 app.middleware("http")(csrf_middleware)
 
 app.add_middleware(

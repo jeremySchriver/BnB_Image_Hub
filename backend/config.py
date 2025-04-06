@@ -1,7 +1,7 @@
 import os
 import secrets
 from pydantic_settings import BaseSettings
-from typing import Optional
+from typing import Optional, List
 
 # Base directories
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -35,12 +35,49 @@ class Settings(BaseSettings):
     debug: Optional[bool] = None
     reload: Optional[bool] = None
     
+    # Security settings
+    PRODUCTION: bool = False
+    ALLOWED_ORIGINS: List[str] = ["http://localhost:8080"]
+    CSP_DIRECTIVES: dict = {
+        "default-src": ["'self'"],
+        "img-src": ["'self'", "data:", "blob:", "https:"],
+        "style-src": ["'self'", "'unsafe-inline'"],
+        "script-src": ["'self'"],  # Stricter for production
+        "connect-src": ["'self'"],
+        "font-src": ["'self'", "data:"],
+        "frame-ancestors": ["'none'"],
+        "object-src": ["'none'"],
+        "base-uri": ["'self'"],
+        "referrer": ["strict-origin-when-cross-origin"]
+    }
+    
     class Config:
         env_file = ".env"
         extra = "ignore"  # This will ignore any extra fields not defined in the model
 
 # Create settings instance
 settings = Settings()
+
+def get_csp_header() -> str:
+    """Generate CSP header based on environment"""
+    if settings.PRODUCTION:
+        return "; ".join(
+            f"{key} {' '.join(values)}" 
+            for key, values in settings.CSP_DIRECTIVES.items()
+        )
+    else:
+        # Development CSP with looser restrictions
+        return (
+            "default-src 'self'; "
+            "img-src 'self' data: blob: http://localhost:8000; "
+            "style-src 'self' 'unsafe-inline'; "
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+            "connect-src 'self' http://localhost:8000; "
+            "font-src 'self' data:; "
+            "frame-ancestors 'none'; "
+            "object-src 'none'; "
+            "base-uri 'self';"
+        )
 
 # Ensure directories exist
 for directory in [FILE_SHARE_DIR, UNTAGGED_DIR, TAGGED_DIR, TAG_PREVIEW_DIR, SEARCH_PREVIEW_DIR]:
