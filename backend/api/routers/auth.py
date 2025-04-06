@@ -18,6 +18,7 @@ from backend.utils.email import send_password_reset_email
 from backend.database.schemas.user import UserResponse
 from backend.database.models.user import User
 from backend.config import settings
+from backend.api.utils.validation import validate_password
 
 router = APIRouter(
     prefix="/auth",
@@ -272,6 +273,10 @@ async def handle_password_reset(
     request: ResetPasswordRequest,
     db: Session = Depends(get_db)
 ):
+    # Validate password complexity
+    validate_password(request.new_password)
+    
+    # Proceed with password reset
     user = reset_password(db, request.token, request.new_password)
     return {"message": "Password reset successfully"}
 

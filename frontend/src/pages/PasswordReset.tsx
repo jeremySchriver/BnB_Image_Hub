@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import Button from '@/components/Button';
 import { createAPIClient } from '@/utils/api';
+import { validatePassword } from '@/utils/validation';
 
 const PasswordReset = () => {
   const [searchParams] = useSearchParams();
@@ -16,21 +17,21 @@ const PasswordReset = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!token) {
-      toast.error('Invalid reset token');
-      return;
-    }
+  if (!token) {
+    toast.error('Invalid reset token');
+    return;
+  }
 
-    if (password.length < 8) {
-      toast.error('Password must be at least 8 characters long');
-      return;
-    }
+  const validation = validatePassword(password);
+  if (!validation.isValid) {
+    toast.error(validation.message);
+    return;
+  }
 
-    if (password !== confirmPassword) {
-      toast.error('Passwords do not match');
-      return;
-    }
-
+  if (password !== confirmPassword) {
+    toast.error('Passwords do not match');
+    return;
+  }
     setIsLoading(true);
 
     try {
@@ -67,6 +68,14 @@ const PasswordReset = () => {
               className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:border-primary"
               required
             />
+            <p className="text-sm text-muted-foreground">
+              Password must be at least 8 characters long and contain:
+              <ul className="list-disc list-inside ml-2">
+                <li>One uppercase letter</li>
+                <li>One number</li>
+                <li>One special character (!@#$%^&*(),.?":{}|&lt;&gt;)</li>
+              </ul>
+            </p>
           </div>
 
           <div className="space-y-2">
