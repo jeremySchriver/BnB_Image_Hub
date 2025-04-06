@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { LogIn } from 'lucide-react';
 import { toast } from 'sonner';
 import Button from '@/components/Button';
+import { Link } from 'react-router-dom';
 import { login } from '@/utils/api';
 
 const Login = () => {
@@ -95,6 +96,15 @@ const Login = () => {
           >
             Sign in
           </Button>
+
+          <div className="flex justify-between items-center mt-2">
+            <Link 
+              to="/forgot-password" 
+              className="text-sm text-primary hover:underline"
+            >
+              Forgot password?
+            </Link>
+          </div>
         </form>
 
         <p className="text-center text-sm text-muted-foreground mt-6 animate-slide-up" style={{ animationDelay: '200ms' }}>

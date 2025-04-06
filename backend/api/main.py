@@ -14,7 +14,14 @@ csrf_tokens = set()
 async def csrf_middleware(request: Request, call_next):
     # Skip CSRF check for safe methods and auth endpoints
     if (request.method in ["GET", "HEAD", "OPTIONS"] or 
-        request.url.path in ["/auth/login", "/auth/refresh", "/auth/csrf-token"]):
+        request.url.path in [
+            "/auth/login", 
+            "/auth/refresh", 
+            "/auth/csrf-token",
+            "/auth/forgot-password",
+            "/auth/reset-password"    
+        ]):
+        #request.url.path in ["/auth/login", "/auth/refresh", "/auth/csrf-token"]):
         response = await call_next(request)
         return response
         

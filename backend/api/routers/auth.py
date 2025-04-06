@@ -7,9 +7,14 @@ from slowapi.util import get_remote_address
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 from typing import Optional
-
+from pydantic import BaseModel, EmailStr
 from backend.database.database import get_db
 from backend.database.services.user_service import authenticate_user, get_user_by_id
+from backend.database.services.password_reset_service import (
+    create_password_reset_token,
+    reset_password
+)
+from backend.utils.email import send_password_reset_email
 from backend.database.schemas.user import UserResponse
 from backend.database.models.user import User
 from backend.config import settings
@@ -23,6 +28,13 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # Create a limiter instance
 limiter = Limiter(key_func=get_remote_address)
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+    
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
@@ -137,6 +149,18 @@ async def login_for_access_token(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Incorrect username or password"
             )
+            
+        if user.is_locked:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Account is locked. Please contact administrator"
+            )
+            
+        if user.force_password_change:
+            return {
+                "requires_password_change": True,
+                "message": "Password change required"
+            }
 
         access_token = create_access_token(data={"sub": str(user.id)})
         refresh_token = create_refresh_token(data={"sub": str(user.id)})
@@ -233,3 +257,34 @@ async def refresh_token(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid refresh token"
         )
+        
+@router.post("/forgot-password")
+async def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    token = create_password_reset_token(db, request.email)
+    if token:
+        reset_link = f"http://localhost:8080/reset-password?token={token}"
+        await send_password_reset_email(request.email, reset_link)
+    
+    return {"message": "If an account exists with this email, a password reset link will be sent"}
+
+@router.post("/reset-password")
+async def handle_password_reset(
+    request: ResetPasswordRequest,
+    db: Session = Depends(get_db)
+):
+    user = reset_password(db, request.token, request.new_password)
+    return {"message": "Password reset successfully"}
+
+@router.post("/force-password-change/{user_id}")
+async def force_password_change(
+    user_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    user = get_user_by_id(db, user_id)
+    user.force_password_change = True
+    db.commit()
+    return {"message": "User must change password on next login"}

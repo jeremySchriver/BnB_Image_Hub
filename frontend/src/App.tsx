@@ -12,6 +12,8 @@ import ImageSearch from "./pages/ImageSearch";
 import AuthorManagement from "./pages/AuthorManagement";
 import AccountManagement from "./pages/AccountManagement";
 import UserManagement from "./pages/UserManagement";
+import ForgotPassword from "./pages/ForgotPassword";
+import PasswordReset from "./pages/PasswordReset";
 import NotFound from "./pages/NotFound";
 import { isAuthenticated } from "./utils/api";
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -98,6 +100,8 @@ const App = () => (
               </ProtectedRoute>
             } 
           />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<PasswordReset />} />
           
           {/* 404 route */}
           <Route path="*" element={<NotFound />} />
