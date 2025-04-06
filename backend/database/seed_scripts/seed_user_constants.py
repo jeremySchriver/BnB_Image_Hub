@@ -14,9 +14,9 @@ from backend.database.services.user_service import get_user_by_email, create_use
 
 # Initial data using UserCreate instead of UserBase
 user_constants = [
-    UserCreate(email="jer@bnb.com", username="jer", password="test123",is_admin=True, is_superuser=True),
-    UserCreate(email="alice@bnb.com", username="alice", password="test234",is_admin=True),
-    UserCreate(email="usertester@bnb.com", username="stock_user", password="stockPersona",is_admin=True)
+    UserCreate(email="jer@bnb.com", username="jer", password="test123", is_admin=True, is_superuser=True),
+    UserCreate(email="alice@bnb.com", username="alice", password="test234", is_admin=True),
+    UserCreate(email="usertester@bnb.com", username="stock_user", password="stockPersona",is_admin=False),
 ]
 
 def seed_user_constants(db: Session, user_constants: list[UserCreate]):  # Updated type hint

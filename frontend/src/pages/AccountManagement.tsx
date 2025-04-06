@@ -8,6 +8,7 @@ import Navbar from '@/components/Navbar';
 import { Input } from "@/components/ui/input";
 import { getCurrentUser, updateUserProfile } from '@/utils/api';
 import type { User } from '@/utils/types';
+import { validatePassword } from '@/utils/validation';
 
 interface AccountForm {
   email: string;
@@ -88,8 +89,9 @@ const AccountManagement = () => {
           return;
         }
   
-        if (formData.newPassword.length < 8) {
-          toast.error("New password must be at least 8 characters long");
+        const validation = validatePassword(formData.newPassword);
+        if (!validation.isValid) {
+          toast.error(validation.message);
           setIsLoading(false);
           return;
         }

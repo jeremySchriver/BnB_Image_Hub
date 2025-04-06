@@ -52,6 +52,11 @@ export interface Author {
   date_added: string;
 }
 
+export interface ApiClient {
+  forgotPassword: (email: string) => Promise<{ message: string }>;
+  resetPassword: (token: string, newPassword: string) => Promise<{ message: string }>;
+}
+
 interface SearchFilters {
   tags?: string[];
   author?: string;
@@ -83,7 +88,6 @@ interface LogoutResponse {
 // API Client Setup
 // =============================================================================
 
-// Replace the existing createAPIClient function
 export const createAPIClient = () => {
   let csrfToken: string | null = null;
 
@@ -169,6 +173,44 @@ export const createAPIClient = () => {
       return response.status === 204 ? undefined : response.json() as Promise<T>;
     },
 
+    forgotPassword: async (email: string) => {
+      const response = await fetch(`${BASE_URL}/auth/forgot-password`, {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({ email }),
+      });
+      
+      if (!response.ok) {
+          throw new Error('Failed to send password reset email');
+      }
+      
+      return response.json();
+    },
+    
+    resetPassword: async (token: string, newPassword: string) => {
+      const response = await fetch(`${BASE_URL}/auth/reset-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          token,
+          new_password: newPassword
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to reset password');
+      }
+
+      return response.json();
+    },
+
     clearCsrfToken: () => {
       csrfToken = null;
     }
@@ -198,7 +240,13 @@ export const login = async (username: string, password: string): Promise<void> =
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.detail || 'Invalid credentials');
+    if (response.status === 429) {
+      const retryAfter = response.headers.get('Retry-After') || '60';
+      throw new Error(`429: Too many attempts. Try again in ${retryAfter} seconds.`);
+    }
+    else {
+      throw new Error(error.detail || 'Invalid credentials');
+    }
   }
 
   const data = await response.json();
@@ -273,6 +321,10 @@ export const getCurrentUser = async (): Promise<User> => {
 export const getAllUsers = async (): Promise<User[]> => {
   return apiClient.get(`${BASE_URL}/users/all`);
 };
+
+export const sendResetPasswordEmail = async (email: string) => {
+  return apiClient.post(`${BASE_URL}/auth/forgot-password`, { email });
+}
 
 // Create user profile
 export const createUser = async (userData: { 

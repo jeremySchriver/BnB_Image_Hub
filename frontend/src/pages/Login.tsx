@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { LogIn } from 'lucide-react';
 import { toast } from 'sonner';
 import Button from '@/components/Button';
+import { Link } from 'react-router-dom';
 import { login } from '@/utils/api';
 
 const Login = () => {
@@ -10,12 +11,21 @@ const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [remainingAttempts, setRemainingAttempts] = useState<number | null>(null);
+  const [lockoutUntil, setLockoutUntil] = useState<Date | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!email || !password) {
       toast.error('Please enter both email and password');
+      return;
+    }
+
+    // Check if we're in a lockout period
+    if (lockoutUntil && new Date() < lockoutUntil) {
+      const secondsRemaining = Math.ceil((lockoutUntil.getTime() - new Date().getTime()) / 1000);
+      toast.error(`Too many login attempts. Please try again in ${secondsRemaining} seconds.`);
       return;
     }
     
@@ -26,7 +36,19 @@ const Login = () => {
       toast.success('Login successful');
       navigate('/upload');
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Login failed. Please try again.');
+      if (error instanceof Error) {
+        if (error.message.includes('429')) {
+          // Rate limit exceeded
+          const retryAfter = parseInt(error.message.match(/\d+/)?.[0] || '60');
+          const lockoutTime = new Date(Date.now() + retryAfter * 1000);
+          setLockoutUntil(lockoutTime);
+          toast.error(`Too many login attempts. Please try again in ${retryAfter} seconds.`);
+        } else {
+          toast.error(error.message);
+        }
+      } else {
+        toast.error('Login failed. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -74,6 +96,15 @@ const Login = () => {
           >
             Sign in
           </Button>
+
+          <div className="flex justify-between items-center mt-2">
+            <Link 
+              to="/forgot-password" 
+              className="text-sm text-primary hover:underline"
+            >
+              Forgot password?
+            </Link>
+          </div>
         </form>
 
         <p className="text-center text-sm text-muted-foreground mt-6 animate-slide-up" style={{ animationDelay: '200ms' }}>
