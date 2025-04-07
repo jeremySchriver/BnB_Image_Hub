@@ -1,4 +1,5 @@
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response, HTTPException
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -6,8 +7,21 @@ import secrets
 from typing import Optional
 from backend.config import settings, get_csp_header
 from backend.api.routers import images, users, tags, authors, preview_resize, auth
+from backend.utils.logging_config import setup_logging
+from backend.utils.error_handling import (
+    handle_error, 
+    create_error_response,
+    AppError
+)
+from backend.utils.error_codes import ErrorCode
 
-app = FastAPI()
+logger = setup_logging("main")
+
+app = FastAPI(
+    title="Image Tagger API",
+    description="API for image tagging application",
+    version="1.0.0"
+)
 
 # Add to your existing code
 CSRF_TOKEN_LENGTH = 32
@@ -77,3 +91,39 @@ async def get_csrf_token(response: Response):
     token = secrets.token_urlsafe(CSRF_TOKEN_LENGTH)
     csrf_tokens.add(token)
     return {"csrf_token": token}
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    error_code = getattr(exc, "error_code", ErrorCode.INTERNAL_ERROR)
+    error_response = create_error_response(
+        error_code=error_code,
+        message=str(exc.detail),
+        request=request
+    )
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=error_response.dict()
+    )
+
+@app.exception_handler(AppError)
+async def app_error_handler(request: Request, exc: AppError):
+    error_response = create_error_response(
+        error_code=exc.error_code,
+        message=exc.message,
+        request=request,
+        detail=exc.detail
+    )
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=error_response.dict()
+    )
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    handle_error(
+        error=exc,
+        request=request,
+        log_message=f"Unhandled error on {request.method} {request.url.path}",
+        error_code=ErrorCode.INTERNAL_ERROR,
+        public_message="An unexpected error occurred"
+    )

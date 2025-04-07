@@ -19,11 +19,16 @@ from backend.database.schemas.user import UserResponse
 from backend.database.models.user import User
 from backend.config import settings
 from backend.api.utils.validation import validate_password
+from backend.utils.logging_config import setup_logging
+from backend.utils.error_codes import ErrorCode
+from backend.utils.error_handling import handle_error, AppError
 
 router = APIRouter(
     prefix="/auth",
     tags=["auth"]
 )
+
+logger = setup_logging("auth")
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
@@ -76,11 +81,16 @@ def verify_jwt_token(token: str) -> dict:
     except JWTError as e:
         raise JWTError(f"Failed to decode token: {str(e)}")
 
-async def get_current_user(auth_token: str = Cookie(None), db: Session = Depends(get_db)) -> User:
+async def get_current_user(
+    request: Request,
+    auth_token: str = Cookie(None), 
+    db: Session = Depends(get_db)
+    ) -> User:
     if not auth_token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated"
+        raise AppError(
+            message="Not authenticated",
+            error_code=ErrorCode.INVALID_TOKEN,
+            status_code=status.HTTP_401_UNAUTHORIZED
         )
     
     try:        
@@ -90,50 +100,68 @@ async def get_current_user(auth_token: str = Cookie(None), db: Session = Depends
         # Get user from database
         user = get_user_by_id(db, int(payload['sub']))
         if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User not found"
+            raise AppError(
+                message="User not found",
+                error_code=ErrorCode.USER_NOT_FOUND,
+                status_code=status.HTTP_401_UNAUTHORIZED
             )
         return user
         
     except JWTError as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication token"
+        raise AppError(
+            message="Invalid authentication token",
+            error_code=ErrorCode.INVALID_TOKEN,
+            status_code=status.HTTP_401_UNAUTHORIZED
         )
     except Exception as e:
-        raise HTTPException(
+        handle_error(
+            error=e,
+            request=request,
+            log_message="Internal server error during authentication",
+            error_code=ErrorCode.INTERNAL_ERROR,
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error during authentication"
+            public_message="Unable to get user"
         )
 
 @router.post("/token")
 async def login(
+    request: Request,
     response: Response,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
-    user = authenticate_user(db, form_data.username, form_data.password)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password"
+    try:
+        user = authenticate_user(db, form_data.username, form_data.password)
+        if not user:
+            raise AppError(
+                message="Invalid credentials",
+                error_code=ErrorCode.INVALID_CREDENTIALS,
+                status_code=status.HTTP_401_UNAUTHORIZED
+            )
+
+        access_token = create_access_token(
+            data={"sub": str(user.id)}
         )
 
-    access_token = create_access_token(
-        data={"sub": str(user.id)}
-    )
+        response.set_cookie(
+            key="auth_token",
+            value=access_token,
+            httponly=True,
+            secure=False,  # Set to True in production
+            samesite="lax",
+            path="/"
+        )
 
-    response.set_cookie(
-        key="auth_token",
-        value=access_token,
-        httponly=True,
-        secure=False,  # Set to True in production
-        samesite="lax",
-        path="/"
-    )
-
-    return {"status": "success"}
+        return {"status": "success"}
+    except Exception as e:
+        handle_error(
+            error=e,
+            request=request,
+            log_message="Unexpected error during login",
+            error_code=ErrorCode.INTERNAL_ERROR,
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            public_message="Authentication failed"
+        )
 
 @router.post("/login")
 @limiter.limit("5/minute")  # Allow 5 login attempts per minute per IP
@@ -146,15 +174,17 @@ async def login_for_access_token(
     try:
         user = authenticate_user(db, form_data.username, form_data.password)
         if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect username or password"
+            raise AppError(
+                message="Incorrect username or password",
+                error_code=ErrorCode.INVALID_CREDENTIALS,
+                status_code=status.HTTP_401_UNAUTHORIZED
             )
             
         if user.is_locked:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Account is locked. Please contact administrator"
+            raise AppError(
+                message="Account is locked. Please contact administrator",
+                error_code=ErrorCode.ACCOUNT_LOCKED,
+                status_code=status.HTTP_403_FORBIDDEN
             )
             
         if user.force_password_change:
@@ -225,18 +255,20 @@ async def refresh_token(
     db: Session = Depends(get_db)
 ):
     if not refresh_token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="No refresh token"
+        raise AppError(
+            message="No refresh token",
+            error_code=ErrorCode.INVALID_TOKEN,
+            status_code=status.HTTP_401_UNAUTHORIZED
         )
     
     try:
         payload = verify_jwt_token(refresh_token)
         user = get_user_by_id(db, int(payload['sub']))
         if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User not found"
+            raise AppError(
+                message="User not found",
+                error_code=ErrorCode.USER_NOT_FOUND,
+                status_code=status.HTTP_401_UNAUTHORIZED
             )
             
         access_token = create_access_token(data={"sub": str(user.id)})
@@ -254,9 +286,10 @@ async def refresh_token(
         return {"access_token": access_token}
         
     except JWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid refresh token"
+        raise AppError(
+            message="Invalid refresh token",
+            error_code=ErrorCode.INVALID_TOKEN,
+            status_code=status.HTTP_401_UNAUTHORIZED
         )
         
 @router.post("/forgot-password")
@@ -287,7 +320,11 @@ async def force_password_change(
     db: Session = Depends(get_db)
 ):
     if not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="Not authorized")
+        raise AppError(
+            message="Insufficient permissions to perform this action",
+            error_code=ErrorCode.INSUFFICIENT_PERMISSIONS,
+            status_code=status.HTTP_403_FORBIDDEN
+        )
     
     user = get_user_by_id(db, user_id)
     user.force_password_change = True
