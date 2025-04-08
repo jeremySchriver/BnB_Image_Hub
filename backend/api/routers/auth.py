@@ -297,7 +297,7 @@ async def refresh_token(
 async def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db)):
     token = create_password_reset_token(db, request.email)
     if token:
-        reset_link = f"http://localhost:8080/reset-password?token={token}"
+        reset_link = f"{settings.FRONTEND_URL}/reset-password?token={token}"
         await send_password_reset_email(request.email, reset_link)
     
     return {"message": "If an account exists with this email, a password reset link will be sent"}

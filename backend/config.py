@@ -40,12 +40,9 @@ class Settings(BaseSettings):
     debug: Optional[bool] = None
     reload: Optional[bool] = None
     
-    # Cookie settings  
-    COOKIE_SECURE: bool = False  # Set to True in production
-    COOKIE_SAMESITE: str = "lax"
-    
     # Security settings
     PRODUCTION: bool = False
+    COOKIE_SAMESITE: str = "lax"
     ALLOWED_ORIGINS: List[str] = ["http://localhost:8080"]
     CSP_DIRECTIVES: dict = {
         "default-src": ["'self'"],
@@ -59,6 +56,16 @@ class Settings(BaseSettings):
         "base-uri": ["'self'"],
         "referrer": ["strict-origin-when-cross-origin"]
     }
+    
+    # URL settings
+    if PRODUCTION:
+        BASE_URL: str = "https://your-production-url.com"
+        FRONTEND_URL: str = "https://your-production-frontend-url.com"
+        COOKIE_SECURE: bool = True
+    else:
+        BASE_URL: str = "http://localhost:8000"
+        FRONTEND_URL: str = "http://localhost:8080"
+        COOKIE_SECURE: bool = False
     
     class Config:
         env_file = ".env"
