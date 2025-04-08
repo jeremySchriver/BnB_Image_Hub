@@ -116,14 +116,18 @@ export const createAPIClient = () => {
           'X-CSRF-Token': token || ''
         };
       }
+
+      // Only set Content-Type if not FormData
+      if (!(options.body instanceof FormData)) {
+        options.headers = {
+          'Content-Type': 'application/json',
+          ...options.headers,
+        };
+      }
   
       const response = await fetchWithRefresh(url, {
         ...options,
         credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          ...options.headers,
-        }
       });
   
       // Handle CSRF failures with retry
@@ -370,10 +374,14 @@ export const uploadImages = async (files: File[]): Promise<{
 }> => {
   const formData = new FormData();
   files.forEach(file => {
-      formData.append('files', file);
+    formData.append('files', file);
   });
   
-  return apiClient.post(`${BASE_URL}/images/upload/batch`, formData);
+  return apiClient.post<{
+    success: boolean,
+    message: string,
+    failed?: string[]
+  }>(`${BASE_URL}/images/upload/batch`, formData);
 };
 
 export const updateImageMetadata = async (
