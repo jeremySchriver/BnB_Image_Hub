@@ -293,6 +293,7 @@ async def refresh_token(
         )
         
 @router.post("/forgot-password")
+@limiter.limit("5/hour")  # Allow 5 password reset requests per hour per IP
 async def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db)):
     token = create_password_reset_token(db, request.email)
     if token:
@@ -302,6 +303,7 @@ async def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(
     return {"message": "If an account exists with this email, a password reset link will be sent"}
 
 @router.post("/reset-password")
+@limiter.limit("3/hour")  # Allow 3 password resets per hour per IP
 async def handle_password_reset(
     request: ResetPasswordRequest,
     db: Session = Depends(get_db)
@@ -319,7 +321,7 @@ async def force_password_change(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    if not current_user.is_admin:
+    if not current_user.is_superuser:
         raise AppError(
             message="Insufficient permissions to perform this action",
             error_code=ErrorCode.INSUFFICIENT_PERMISSIONS,

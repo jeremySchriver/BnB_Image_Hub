@@ -1,9 +1,10 @@
 from fastapi import APIRouter, HTTPException, Depends, Query, File, UploadFile, status, Request
 from fastapi.responses import FileResponse
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import os
-import logging
 import shutil
 
 from backend.database.database import get_db
@@ -13,7 +14,6 @@ from backend.database.schemas.tag import TagResponse
 from backend.database.models.tag import Tag
 from backend.database.models.author import Author
 from backend.database.models.user import User
-from backend.database.schemas.user import UserCreate, UserResponse, UserUpdate
 from backend.database.services.image_service import (
     get_image, get_all_untagged_images, get_next_untagged_image,
     update_image_tags, update_image_metadata, _generate_hash_filename,
@@ -26,14 +26,17 @@ from backend.utils.logging_config import setup_logging
 from backend.utils.error_codes import ErrorCode
 from backend.utils.error_handling import handle_error, AppError
 
-# Set up logger for this module
-logger = setup_logging("images")
-
 # Initialize router
 router = APIRouter(
     prefix="/images",
     tags=["images"]
 )
+
+# Set up logger for this module
+logger = setup_logging("images")
+
+# Create a limiter instance
+limiter = Limiter(key_func=get_remote_address)
 
 #############################################
 # Image Content Endpoints
@@ -540,7 +543,9 @@ async def upload_batch_images(
         )
         
 @router.delete("/images/{image_id}")
+@limiter.limit("20/minute")  # Limit to 20 requests per minute
 async def delete_image_endpoint(
+    request: Request,
     image_id: int, 
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)  # Add this line
@@ -584,7 +589,16 @@ async def delete_image_endpoint(
         delete_image(db, image_id)
         return {"message": "Image deleted successfully"}
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to delete image record: {str(e)}"
-        )
+        if isinstance(e, HTTPException) and e.status_code == 429:
+            # Rate limit exceeded
+            retry_after = 60
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Too many login attempts. Please try again in {retry_after} seconds.",
+                headers={"Retry-After": str(retry_after)}
+            )
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to delete image record: {str(e)}"
+            )

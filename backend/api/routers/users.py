@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi.responses import JSONResponse
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 from typing import List
-from fastapi.responses import JSONResponse
 from backend.database.database import get_db
 from backend.database.models.user import User
 from backend.database.schemas.user import UserCreate, UserResponse, UserUpdate
@@ -20,16 +22,20 @@ from backend.utils.logging_config import setup_logging
 from backend.utils.error_codes import ErrorCode
 from backend.utils.error_handling import handle_error, AppError
 
-# Set up logger for this module
-logger = setup_logging("users")
-
 router = APIRouter(
     prefix="/users",
     tags=["users"]
 )
 
+# Set up logger for this module
+logger = setup_logging("users")
+
+# Create a limiter instance
+limiter = Limiter(key_func=get_remote_address)
+
 # Endpoint to add admin status for a user
 @router.post("/{user_email}/admin", response_model=UserResponse)
+@limiter.limit("10/hour") 
 async def set_admin_status(
     request: Request,
     user_email: str,
@@ -58,6 +64,7 @@ async def set_admin_status(
 
 # Endpoint to remove admin status from a user
 @router.delete("/{user_email}/admin", response_model=UserResponse)
+@limiter.limit("10/hour") 
 async def remove_admin_status(
     request: Request,
     user_email: str,
@@ -86,6 +93,7 @@ async def remove_admin_status(
 
 # Create a new user
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("30/day") 
 def create_new_user(
     user: UserCreate, 
     request: Request, 
@@ -121,6 +129,7 @@ def create_new_user(
 
 # Endpoint to delete a user
 @router.delete("/{user_email}", response_model=None)
+@limiter.limit("30/hour") 
 async def delete_user(
     request: Request,
     user_email: str,
