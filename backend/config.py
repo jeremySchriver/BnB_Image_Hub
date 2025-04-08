@@ -17,7 +17,12 @@ class Settings(BaseSettings):
     # Security settings
     SECRET_KEY: str = secrets.token_urlsafe(32)
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    
+    #Token settings
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
+    REFRESH_TOKEN_EXPIRE_HOURS: int = 7
+    TOKEN_ALGORITHM: str = "HS256"
+    CSRF_TOKEN_LENGTH = 32
     
     # Database settings
     DATABASE_URL: str = f"sqlite:///{BASE_DIR}/backend/database/tagger_db.db"
@@ -34,6 +39,10 @@ class Settings(BaseSettings):
     pythonpath: Optional[str] = None
     debug: Optional[bool] = None
     reload: Optional[bool] = None
+    
+    # Cookie settings  
+    COOKIE_SECURE: bool = False  # Set to True in production
+    COOKIE_SAMESITE: str = "lax"
     
     # Security settings
     PRODUCTION: bool = False

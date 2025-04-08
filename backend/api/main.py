@@ -24,7 +24,6 @@ app = FastAPI(
 )
 
 # Add to your existing code
-CSRF_TOKEN_LENGTH = 32
 csrf_tokens = set()
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -88,7 +87,7 @@ app.include_router(auth.router)
 # CSRF token endpoint
 @app.get("/auth/csrf-token")
 async def get_csrf_token(response: Response):
-    token = secrets.token_urlsafe(CSRF_TOKEN_LENGTH)
+    token = secrets.token_urlsafe(settings.CSRF_TOKEN_LENGTH)
     csrf_tokens.add(token)
     return {"csrf_token": token}
 
