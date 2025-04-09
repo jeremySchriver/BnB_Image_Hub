@@ -1,9 +1,10 @@
-from fastapi import APIRouter, HTTPException, Depends, Query, File, UploadFile
+from fastapi import APIRouter, HTTPException, Depends, Query, File, UploadFile, status, Request
 from fastapi.responses import FileResponse
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import os
-import logging
 import shutil
 
 from backend.database.database import get_db
@@ -13,7 +14,6 @@ from backend.database.schemas.tag import TagResponse
 from backend.database.models.tag import Tag
 from backend.database.models.author import Author
 from backend.database.models.user import User
-from backend.database.schemas.user import UserCreate, UserResponse, UserUpdate
 from backend.database.services.image_service import (
     get_image, get_all_untagged_images, get_next_untagged_image,
     update_image_tags, update_image_metadata, _generate_hash_filename,
@@ -22,15 +22,21 @@ from backend.database.services.image_service import (
 from backend.config import TAG_PREVIEW_DIR, SEARCH_PREVIEW_DIR, UNTAGGED_DIR
 from backend.processor.thumbnail_generator import generate_previews
 from backend.api.routers.auth import get_current_user
-
-# Configure logging
-logger = logging.getLogger(__name__)
+from backend.utils.logging_config import setup_logging
+from backend.utils.error_codes import ErrorCode
+from backend.utils.error_handling import handle_error, AppError
 
 # Initialize router
 router = APIRouter(
     prefix="/images",
     tags=["images"]
 )
+
+# Set up logger for this module
+logger = setup_logging("images")
+
+# Create a limiter instance
+limiter = Limiter(key_func=get_remote_address)
 
 #############################################
 # Image Content Endpoints
@@ -109,9 +115,10 @@ def update_tags(
         )
         
         if not updated_image:
-            raise HTTPException(
-                status_code=404,
-                detail="Image not found"
+            raise AppError(
+                message="Image not found",
+                error_code=ErrorCode.IMAGE_NOT_FOUND,
+                status_code=status.HTTP_404_NOT_FOUND
             )
             
         return updated_image
@@ -146,9 +153,10 @@ def update_metadata(
         )
         
         if not updated_image:
-            raise HTTPException(
-                status_code=404,
-                detail="Image not found"
+            raise AppError(
+                message="Image not found",
+                error_code=ErrorCode.IMAGE_NOT_FOUND,
+                status_code=status.HTTP_404_NOT_FOUND
             )
             
         return updated_image
@@ -218,7 +226,11 @@ def get_images_by_tag(
         images = db.query(Image).join(Image.tags).filter(Tag.name == tag_name).all()
         
         if not images:
-            raise HTTPException(status_code=404, detail="No images found with this tag")
+            raise AppError(
+                message="No images found with this tag",
+                error_code=ErrorCode.IMAGE_NOT_FOUND,
+                status_code=status.HTTP_404_NOT_FOUND
+            )
         
         # Format response
         response = []
@@ -254,7 +266,11 @@ def get_image_by_id(
     try:
         image = get_image(db, image_id)
         if not image:
-            raise HTTPException(status_code=404, detail="Image not found")
+            raise AppError(
+                message="Image not found",
+                error_code=ErrorCode.IMAGE_NOT_FOUND,
+                status_code=status.HTTP_404_NOT_FOUND
+            )
         
         # Convert tags to TagResponse objects
         tag_responses = [
@@ -411,17 +427,29 @@ async def get_preview(
     """
     try:
         if size not in ['preview', 'search']:
-            raise HTTPException(status_code=400, detail="Invalid preview size")
+            raise AppError(
+                message="Invalid preview size",
+                error_code=ErrorCode.INVALID_IMAGE_FORMAT,
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
             
         image = get_image(db, image_id)
         if not image:
-            raise HTTPException(status_code=404, detail="Image not found")
+            raise AppError(
+                message="Image not found",
+                error_code=ErrorCode.IMAGE_NOT_FOUND,
+                status_code=status.HTTP_404_NOT_FOUND
+            )
         
         # Use the stored preview path directly from the database
         preview_path = image.search_preview_path if size == 'search' else image.tag_preview_path
         
         if not preview_path or not os.path.exists(preview_path):
-            raise HTTPException(status_code=404, detail=f"Preview not found at {preview_path}")
+            raise AppError(
+                message="Preview of image not found",
+                error_code=ErrorCode.IMAGE_NOT_FOUND,
+                status_code=status.HTTP_404_NOT_FOUND
+            )
             
         return FileResponse(preview_path)
         
@@ -515,7 +543,9 @@ async def upload_batch_images(
         )
         
 @router.delete("/images/{image_id}")
+@limiter.limit("20/minute")  # Limit to 20 requests per minute
 async def delete_image_endpoint(
+    request: Request,
     image_id: int, 
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)  # Add this line
@@ -523,13 +553,18 @@ async def delete_image_endpoint(
     """Delete an image and all its associated files."""
     # Check if user is admin
     if not (current_user.is_admin or current_user.is_superuser):
-        raise HTTPException(
-            status_code=403,
-            detail="Only administrators can delete images"
+        raise AppError(
+            message="Insufficient permissions to perform this action",
+            error_code=ErrorCode.INSUFFICIENT_PERMISSIONS,
+            status_code=status.HTTP_403_FORBIDDEN
         )
     image = get_image(db, image_id)
     if not image:
-        raise HTTPException(status_code=404, detail="Image not found")
+        raise AppError(
+            message="Image not found",
+            error_code=ErrorCode.IMAGE_NOT_FOUND,
+            status_code=status.HTTP_404_NOT_FOUND
+        )
 
     # List of paths to delete
     paths_to_delete = [
@@ -554,7 +589,16 @@ async def delete_image_endpoint(
         delete_image(db, image_id)
         return {"message": "Image deleted successfully"}
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to delete image record: {str(e)}"
-        )
+        if isinstance(e, HTTPException) and e.status_code == 429:
+            # Rate limit exceeded
+            retry_after = 60
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Too many login attempts. Please try again in {retry_after} seconds.",
+                headers={"Retry-After": str(retry_after)}
+            )
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to delete image record: {str(e)}"
+            )
