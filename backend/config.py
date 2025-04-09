@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_HOURS: int = 7
     TOKEN_ALGORITHM: str = "HS256"
-    CSRF_TOKEN_LENGTH = 32
+    CSRF_TOKEN_LENGTH: int = 32
     
     # Database settings
     DATABASE_URL: str = f"sqlite:///{BASE_DIR}/backend/database/tagger_db.db"
