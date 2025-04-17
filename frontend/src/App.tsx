@@ -10,6 +10,7 @@ import ImageUpload from "./pages/ImageUpload";
 import ImageTagging from "./pages/ImageTagging";
 import ImageSearch from "./pages/ImageSearch";
 import AuthorManagement from "./pages/AuthorManagement";
+import TagManagement from "./pages/TagManagement";
 import AccountManagement from "./pages/AccountManagement";
 import UserManagement from "./pages/UserManagement";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -20,8 +21,6 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import RequireSuperuser from '@/components/RequireSuperuser';
 
 const queryClient = new QueryClient();
-
-
 
 // ScrollToTop component to ensure page scrolls to top on route change
 const ScrollToTop = () => {
@@ -79,6 +78,14 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <AuthorManagement />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/tagmgmt" 
+            element={
+              <ProtectedRoute>
+                <TagManagement />
               </ProtectedRoute>
             } 
           />

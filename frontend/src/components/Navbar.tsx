@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Upload, Tag, Search, LogOut, UserRoundMinus, UserRoundCog, UserXIcon } from 'lucide-react';
+import { Upload, Tag, Search, LogOut, UserRoundMinus, UserRoundCog, UserXIcon, TagsIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
 import { getCurrentUser } from '@/utils/api';
@@ -80,15 +80,23 @@ const Navbar = () => {
             <NavItem 
               to="/authors" 
               icon={<UserRoundMinus className="h-5 w-5" />} 
-              label="Authors" 
+              label="Author Mgmt" 
               isActive={isActive('/authors')} 
+            />
+          )}
+          {(currentUser?.is_superuser || currentUser?.is_admin) && (
+            <NavItem 
+              to="/tagmgmt" 
+              icon={<TagsIcon className="h-5 w-5" />} 
+              label="Tag Mgmt" 
+              isActive={isActive('/tagmgmt')} 
             />
           )}
           {currentUser?.is_superuser && (
             <NavItem 
               to="/users" 
               icon={<UserXIcon className="h-5 w-5" />} 
-              label="User Management" 
+              label="User Mgmt" 
               isActive={isActive('/users')} 
             />
           )}
