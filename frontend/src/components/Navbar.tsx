@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
 import { getCurrentUser } from '@/utils/api';
 import type { User } from '@/utils/types';
+import ManagementMenu from '@/components/ManagementMenu';
 
 interface NavItemProps {
   to: string;
@@ -76,30 +77,10 @@ const Navbar = () => {
             label="My Account" 
             isActive={isActive('/account')} 
           />
-          {(currentUser?.is_superuser || currentUser?.is_admin) && (
-            <NavItem 
-              to="/authors" 
-              icon={<UserRoundMinus className="h-5 w-5" />} 
-              label="Author Mgmt" 
-              isActive={isActive('/authors')} 
-            />
-          )}
-          {(currentUser?.is_superuser || currentUser?.is_admin) && (
-            <NavItem 
-              to="/tagmgmt" 
-              icon={<TagsIcon className="h-5 w-5" />} 
-              label="Tag Mgmt" 
-              isActive={isActive('/tagmgmt')} 
-            />
-          )}
-          {currentUser?.is_superuser && (
-            <NavItem 
-              to="/users" 
-              icon={<UserXIcon className="h-5 w-5" />} 
-              label="User Mgmt" 
-              isActive={isActive('/users')} 
-            />
-          )}
+          <ManagementMenu 
+            currentUser={currentUser} 
+            isActive={isActive('/authors') || isActive('/tagmgmt') || isActive('/users')} 
+          />
         </div>
         
         <div className="hidden sm:flex items-center">
