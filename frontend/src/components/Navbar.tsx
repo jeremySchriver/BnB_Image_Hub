@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { getCurrentUser } from '@/utils/api';
 import type { User } from '@/utils/types';
 import ManagementMenu from '@/components/ManagementMenu';
+import ProfileMenu from '@/components/ProfileMenu';
 
 interface NavItemProps {
   to: string;
@@ -45,14 +46,17 @@ const Navbar = () => {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 sm:top-0 sm:bottom-auto bg-background/80 backdrop-blur-xl border-t sm:border-b border-border/50 py-2 sm:py-4 px-6">
-      <div className="max-w-7xl mx-auto flex justify-between items-center">
-        <div className="hidden sm:block">
+      {/* Change the flex justify-between to justify-center */}
+      <div className="max-w-7xl mx-auto flex justify-center items-center relative">
+        {/* Position the logo absolutely on desktop */}
+        <div className="hidden sm:block absolute left-0">
           <h1 className="text-lg font-medium tracking-tight">
             <span className="text-primary font-semibold">B&B</span> Image Hub
           </h1>
         </div>
         
-        <div className="flex items-center justify-center w-full sm:w-auto space-x-1 sm:space-x-2">
+        {/* Update these classes to improve centering */}
+        <div className="flex items-center space-x-1 sm:space-x-2">
           <NavItem 
             to="/upload" 
             icon={<Upload className="h-5 w-5" />} 
@@ -71,26 +75,15 @@ const Navbar = () => {
             label="Search" 
             isActive={isActive('/search')} 
           />
-          <NavItem 
-            to="/account" 
-            icon={<UserRoundCog className="h-5 w-5" />} 
-            label="My Account" 
-            isActive={isActive('/account')} 
-          />
           <ManagementMenu 
             currentUser={currentUser} 
             isActive={isActive('/authors') || isActive('/tagmgmt') || isActive('/users')} 
           />
-        </div>
-        
-        <div className="hidden sm:flex items-center">
-          <button 
-            onClick={handleLogout}
-            className="flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors duration-200 space-x-1 px-3 py-1 rounded-md hover:bg-secondary"
-          >
-            <LogOut className="h-4 w-4 mr-1" />
-            <span>Log out</span>
-          </button>
+          <ProfileMenu 
+            currentUser={currentUser}
+            isActive={isActive('/account')}
+            onLogout={handleLogout}
+          />
         </div>
       </div>
     </nav>
