@@ -66,6 +66,11 @@ interface TagResponse {
   name: string;
 }
 
+interface TagData {
+  name: string;
+  date_added: string;
+}
+
 interface AdminStatusResponse {
   message: string;
   success: boolean;
@@ -470,6 +475,18 @@ export const updateImageTags = async (
 export const searchTags = async (query: string): Promise<string[]> => {
   const tags = await apiClient.get<TagResponse[]>(`${BASE_URL}/tags/search?query=${encodeURIComponent(query)}`);
   return tags.map(tag => tag.name);
+};
+
+export const getAllTags = async (): Promise<TagData[]> => {
+  return apiClient.get(`${BASE_URL}/tags`);
+};
+
+export const createTag = async (name: string): Promise<TagData> => {
+  return apiClient.post(`${BASE_URL}/tags`, { name });
+};
+
+export const deleteTag = async (name: string): Promise<void> => {
+  return apiClient.delete(`${BASE_URL}/tags/${encodeURIComponent(name)}`);
 };
 
 // =============================================================================

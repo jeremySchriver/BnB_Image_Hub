@@ -17,7 +17,7 @@ def get_tag_id(db: Session, tag_id: int):
 def get_tag_name(db: Session, tag_id: int):
     return db.query(Tag).filter(Tag.id == tag_id).first()
 
-def get_tag_list(db: Session, skip: int = 0, limit: int = 1000):
+def get_tag_list(db: Session, skip: int = 0, limit: int = 3000):
     return db.query(Tag).offset(skip).limit(limit).all()
 
 def get_tag_by_partial_name(db: Session, query: str, limit: int = 10):
