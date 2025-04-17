@@ -1,5 +1,4 @@
-
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -33,89 +32,115 @@ const ScrollToTop = () => {
   return null;
 };
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner position="top-right" closeButton />
-      <BrowserRouter>
-        <ScrollToTop />
-        <Routes>
-          {/* Public route */}
-          <Route path="/login" element={<Login />} />
-          
-          {/* Protected routes */}
-          <Route 
-            path="/" 
-            element={<Navigate to="/upload" replace />} 
-          />
-          <Route 
-            path="/upload" 
-            element={
-              <ProtectedRoute>
-                <ImageUpload />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/tagging" 
-            element={
-              <ProtectedRoute>
-                <ImageTagging />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/search" 
-            element={
-              <ProtectedRoute>
-                <ImageSearch />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/authors" 
-            element={
-              <ProtectedRoute>
-                <AuthorManagement />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/tagmgmt" 
-            element={
-              <ProtectedRoute>
-                <TagManagement />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/account" 
-            element={
-              <ProtectedRoute>
-                <AccountManagement />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/users" 
-            element={
-              <ProtectedRoute>
-                <RequireSuperuser>
-                  <UserManagement />
-                </RequireSuperuser>
-              </ProtectedRoute>
-            } 
-          />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password" element={<PasswordReset />} />
-          
-          {/* 404 route */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+const App = () => {
+  // Add loading state management
+  const [isPageLoading, setIsPageLoading] = useState(true);
+
+  useEffect(() => {
+    // Hide loading state after initial render
+    setIsPageLoading(false);
+    // Add passive listeners for better scroll performance
+    const opts = { passive: true };
+    document.addEventListener('touchstart', () => {}, opts);
+    document.addEventListener('touchmove', () => {}, opts);
+    
+    return () => {
+      document.removeEventListener('touchstart', () => {});
+      document.removeEventListener('touchmove', () => {});
+    };
+  }, []);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      {/* Add loading indicator */}
+      {isPageLoading ? (
+        <div className="fixed inset-0 flex items-center justify-center">
+          <div className="animate-spin">Loading...</div>
+        </div>
+      ) : (
+        <TooltipProvider>
+          <Toaster />
+          <Sonner position="top-right" closeButton />
+          <BrowserRouter>
+            <ScrollToTop />
+            <Routes>
+              {/* Public route */}
+              <Route path="/login" element={<Login />} />
+              
+              {/* Protected routes */}
+              <Route 
+                path="/" 
+                element={<Navigate to="/upload" replace />} 
+              />
+              <Route 
+                path="/upload" 
+                element={
+                  <ProtectedRoute>
+                    <ImageUpload />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/tagging" 
+                element={
+                  <ProtectedRoute>
+                    <ImageTagging />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/search" 
+                element={
+                  <ProtectedRoute>
+                    <ImageSearch />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/authors" 
+                element={
+                  <ProtectedRoute>
+                    <AuthorManagement />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/tagmgmt" 
+                element={
+                  <ProtectedRoute>
+                    <TagManagement />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/account" 
+                element={
+                  <ProtectedRoute>
+                    <AccountManagement />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/users" 
+                element={
+                  <ProtectedRoute>
+                    <RequireSuperuser>
+                      <UserManagement />
+                    </RequireSuperuser>
+                  </ProtectedRoute>
+                } 
+              />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<PasswordReset />} />
+              
+              {/* 404 route */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
+      )}
+    </QueryClientProvider>
+  );
+};
 
 export default App;

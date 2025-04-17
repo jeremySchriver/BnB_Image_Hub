@@ -57,34 +57,24 @@ const ImageTagging = () => {
     if (!currentImage) return;
     
     setSaving(true);
-    setLoading(true); // Add loading state immediately
+    setLoading(true);
     
     try {
       const imageId = parseInt(currentImage.id);
-      if (isNaN(imageId)) {
-        throw new Error('Invalid image ID');
-      }
-  
       const updateData = {
-        tags,
-        author: author || undefined
+        tags: tags.map(tag => tag.trim()), // Don't lowercase here, let API handle it
+        author: author?.trim() || null,
+        filename: currentImage.filename
       };
-  
+
+      console.log('Saving tags:', updateData);
       await updateImageTags(imageId, updateData);
+      
       toast.success('Image tags saved successfully');
-      
-      // Get next image immediately after successful save
-      const nextImageData = await getNextUntaggedImage();
-      if (nextImageData && nextImageData.length > 0) {
-        setCurrentImage(nextImageData[0]);
-        resetFormState();
-      } else {
-        setCurrentImage(null);
-        resetFormState();
-      }
-      
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to save tags';
+      await fetchNextImage(); // Get next image after successful save
+    } catch (error: any) {
+      console.error('Save error:', error);
+      const errorMessage = error.message || 'Failed to save tags';
       toast.error(errorMessage);
     } finally {
       setSaving(false);

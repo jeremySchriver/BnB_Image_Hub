@@ -111,49 +111,62 @@ export const createAPIClient = () => {
     return csrfToken;
   };
 
-  const baseRequest = async (url: string, options: RequestInit = {}, retryCount = 0) => {
-    try {
-        // Add CSRF token for mutating requests
-        if (options.method && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(options.method)) {
-            const token = await ensureCsrfToken();
-            options.headers = {
-                ...options.headers,
-                'X-CSRF-Token': token || '',
-            };
-        }
-
-        options.credentials = 'include';
-        options.headers = {
-            ...options.headers,
-            'Accept': 'application/json',
-        };
-
-        const response = await fetch(url, options);
-
-        // Handle authentication errors
-        if (response.status === 401) {
-            try {
-                const refreshed = await refreshAccessToken();
-                if (refreshed) {
-                    return baseRequest(url, options);
-                }
-            } catch (error) {
-                window.location.href = '/login';
-                throw new Error('Authentication failed');
-            }
-        }
-
-        if (!response.ok) {
-            const error = await response.json().catch(() => ({ detail: 'Network error' }));
-            throw new Error(error.detail || `HTTP error! status: ${response.status}`);
-        }
-
-        return response;
-    } catch (error) {
-        console.error('API Error:', error);
-        throw error;
+  const getCsrfToken = async () => {
+    if (!csrfToken) {
+      try {
+        const response = await fetch(`${BASE_URL}/auth/csrf-token`, {
+          credentials: 'include'
+        });
+        const data = await response.json();
+        csrfToken = data.csrf_token;
+      } catch (error) {
+        console.error('Failed to fetch CSRF token:', error);
+        return null;
+      }
     }
-};
+    return csrfToken;
+  };
+
+  const baseRequest = async (url: string, options: RequestInit = {}) => {
+    try {
+      // Get CSRF token before making request
+      const token = await ensureCsrfToken();
+      
+      const response = await fetch(url, {
+        ...options,
+        credentials: 'include',
+        headers: {
+          ...options.headers,
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': token || '', // Add CSRF token to headers
+        }
+      });
+
+      if (!response.ok) {
+        // Handle non-JSON responses
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await response.json();
+          throw {
+            status: response.status,
+            message: errorData.detail || 'Unknown error occurred',
+            data: errorData
+          };
+        } else {
+          const errorText = await response.text();
+          throw {
+            status: response.status,
+            message: errorText || 'Unknown error occurred'
+          };
+        }
+      }
+
+      return response;
+    } catch (error) {
+      console.error('API Error Details:', error);
+      throw error;
+    }
+  };
 
   return {
     get: async <T>(url: string) => {
@@ -469,9 +482,18 @@ export const updateImageTags = async (
   imageId: number,
   updateData: UpdateImageTagsData
 ): Promise<ImageMetadata> => {
+  // Ensure tags is an array of strings
+  const payload = {
+    tags: updateData.tags.map(tag => tag.toString().trim()),
+    author: updateData.author || null,
+    filename: updateData.filename
+  };
+
+  console.log('Sending payload:', JSON.stringify(payload));
+  
   return apiClient.put<ImageMetadata>(
     `${BASE_URL}/images/tags/${imageId}`,
-    updateData
+    payload
   );
 };
 
