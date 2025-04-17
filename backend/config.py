@@ -43,13 +43,13 @@ class Settings(BaseSettings):
     # Security settings
     PRODUCTION: bool = False
     COOKIE_SAMESITE: str = "lax"
-    ALLOWED_ORIGINS: List[str] = ["http://localhost:8080"]
+    ALLOWED_ORIGINS: List[str] = ["http://localhost:8080","http://192.168.0.73:8080"]
     CSP_DIRECTIVES: dict = {
         "default-src": ["'self'"],
         "img-src": ["'self'", "data:", "blob:", "https:"],
         "style-src": ["'self'", "'unsafe-inline'"],
         "script-src": ["'self'"],  # Stricter for production
-        "connect-src": ["'self'"],
+        "connect-src": ["'self'", "http://192.168.0.73:8000", "http://localhost:8000"],
         "font-src": ["'self'", "data:"],
         "frame-ancestors": ["'none'"],
         "object-src": ["'none'"],
@@ -63,8 +63,8 @@ class Settings(BaseSettings):
         FRONTEND_URL: str = "https://your-production-frontend-url.com"
         COOKIE_SECURE: bool = True
     else:
-        BASE_URL: str = "http://localhost:8000"
-        FRONTEND_URL: str = "http://localhost:8080"
+        BASE_URL: str = "http://192.168.0.73:8000"
+        FRONTEND_URL: str = "http://192.168.0.73:8080"
         COOKIE_SECURE: bool = False
     
     class Config:

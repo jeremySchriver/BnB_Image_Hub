@@ -1,6 +1,6 @@
 // API Connection Layer - Connects to FAST API instance
 
-const BASE_URL = 'http://localhost:8000';
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://192.168.0.73:8000';
 
 // =============================================================================
 // Type Definitions
@@ -113,44 +113,47 @@ export const createAPIClient = () => {
 
   const baseRequest = async (url: string, options: RequestInit = {}, retryCount = 0) => {
     try {
-      // Add CSRF token for mutating requests
-      if (options.method && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(options.method)) {
-        const token = await ensureCsrfToken();
-        options.headers = {
-          ...options.headers,
-          'X-CSRF-Token': token || ''
-        };
-      }
+        // Add CSRF token for mutating requests
+        if (options.method && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(options.method)) {
+            const token = await ensureCsrfToken();
+            options.headers = {
+                ...options.headers,
+                'X-CSRF-Token': token || '',
+            };
+        }
 
-      // Only set Content-Type if not FormData
-      if (!(options.body instanceof FormData)) {
+        options.credentials = 'include';
         options.headers = {
-          'Content-Type': 'application/json',
-          ...options.headers,
+            ...options.headers,
+            'Accept': 'application/json',
         };
-      }
-  
-      const response = await fetchWithRefresh(url, {
-        ...options,
-        credentials: 'include',
-      });
-  
-      // Handle CSRF failures with retry
-      if (response.status === 403 && retryCount < 1) {
-        csrfToken = null; // Clear invalid token
-        return baseRequest(url, options, retryCount + 1);
-      }
-  
-      if (!response.ok) {
-        const error = await response.json().catch(() => null);
-        throw new Error(error?.detail || `HTTP error! status: ${response.status}`);
-      }
-  
-      return response;
+
+        const response = await fetch(url, options);
+
+        // Handle authentication errors
+        if (response.status === 401) {
+            try {
+                const refreshed = await refreshAccessToken();
+                if (refreshed) {
+                    return baseRequest(url, options);
+                }
+            } catch (error) {
+                window.location.href = '/login';
+                throw new Error('Authentication failed');
+            }
+        }
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ detail: 'Network error' }));
+            throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+        }
+
+        return response;
     } catch (error) {
-      throw error;
+        console.error('API Error:', error);
+        throw error;
     }
-  };
+};
 
   return {
     get: async <T>(url: string) => {

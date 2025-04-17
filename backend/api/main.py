@@ -70,10 +70,11 @@ app.middleware("http")(csrf_middleware)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8080"],  
+    allow_origins=settings.ALLOWED_ORIGINS,  # Update with your frontend URL
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*", "X-CSRF-Token"],
+    expose_headers=["content-type", "content-length", "set-cookie"]
 )
 
 # Include routers
