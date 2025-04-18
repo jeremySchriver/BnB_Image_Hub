@@ -148,6 +148,27 @@
   .safe-bottom {
     padding-bottom: calc(env(safe-area-inset-bottom) + 1rem);
   }
+
+  /* Add these styles to your index.css */
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+    /* Prevent vertical scroll while horizontally scrolling */
+    overscroll-behavior-x: contain;
+  }
+
+  /* Optional: Add visual indication of scrollability */
+  .overflow-x-auto::-webkit-scrollbar {
+    height: 4px;
+  }
+
+  .overflow-x-auto::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .overflow-x-auto::-webkit-scrollbar-thumb {
+    @apply bg-muted rounded-full;
+  }
 }
 
 /* Custom Animations */
