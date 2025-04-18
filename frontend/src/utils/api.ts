@@ -132,14 +132,15 @@ export const createAPIClient = () => {
       // Get CSRF token before making request
       const token = await ensureCsrfToken();
       
+      const headers = {
+        ...options.headers,
+        'X-CSRF-Token': token || '', // Add CSRF token to headers
+      };
+
       const response = await fetch(url, {
         ...options,
         credentials: 'include',
-        headers: {
-          ...options.headers,
-          'Content-Type': 'application/json',
-          'X-CSRF-Token': token || '', // Add CSRF token to headers
-        }
+        headers
       });
 
       if (!response.ok) {
@@ -175,17 +176,33 @@ export const createAPIClient = () => {
     },
 
     post: async <T>(url: string, data?: any) => {
+      const headers: Record<string, string> = {};
+      let body: string | FormData;
+    
+      if (data instanceof FormData) {
+        body = data;
+        // Don't set Content-Type for FormData, let browser handle it
+      } else {
+        body = JSON.stringify(data);
+        headers['Content-Type'] = 'application/json';
+      }
+    
       const response = await baseRequest(url, {
         method: 'POST',
-        body: data instanceof FormData ? data : JSON.stringify(data),
-        headers: data instanceof FormData ? {} : { 'Content-Type': 'application/json' }
+        headers,
+        body
       });
       return response.json() as Promise<T>;
     },
 
     put: async <T>(url: string, data: any) => {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+
       const response = await baseRequest(url, {
         method: 'PUT',
+        headers,
         body: JSON.stringify(data)
       });
       return response.json() as Promise<T>;
