@@ -85,7 +85,7 @@ const ImageTagging = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <TransitionWrapper className="max-w-screen-2xl mx-auto">
+      <TransitionWrapper className="max-w-screen-2xl mx-auto pb-[120px]">
         {loading ? (
           <div className="text-center py-12 mt-[72px]">Loading image...</div>
         ) : !currentImage ? (
@@ -94,9 +94,9 @@ const ImageTagging = () => {
             <Button onClick={fetchNextImage}>Refresh</Button>
           </div>
         ) : (
-          <div className="space-y-4 mt-[72px]">
-            {/* Image preview */}
-            <div className="h-[calc(100vh-280px)] flex items-center justify-center bg-secondary/30">
+          <div className="space-y-4 mt-14">
+            {/* Image preview with responsive height */}
+            <div className="h-[40vh] sm:h-[50vh] md:h-[60vh] flex items-center justify-center bg-secondary/30">
               <img
                 src={imageUrls.getPreview(currentImage.id, 'preview')}
                 alt={currentImage.filename}

@@ -55,7 +55,7 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-background">
+    <div className="min-h-[100dvh] flex flex-col items-center justify-center p-4 bg-background overflow-y-auto">
       <div className="max-w-md w-full mx-auto">
         <div className="text-center mb-8 animate-fade-in">
           <h1 className="text-3xl font-bold tracking-tight">
