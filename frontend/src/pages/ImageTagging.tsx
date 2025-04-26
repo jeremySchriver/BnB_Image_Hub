@@ -57,34 +57,24 @@ const ImageTagging = () => {
     if (!currentImage) return;
     
     setSaving(true);
-    setLoading(true); // Add loading state immediately
+    setLoading(true);
     
     try {
       const imageId = parseInt(currentImage.id);
-      if (isNaN(imageId)) {
-        throw new Error('Invalid image ID');
-      }
-  
       const updateData = {
-        tags,
-        author: author || undefined
+        tags: tags.map(tag => tag.trim()), // Don't lowercase here, let API handle it
+        author: author?.trim() || null,
+        filename: currentImage.filename
       };
-  
+
+      console.log('Saving tags:', updateData);
       await updateImageTags(imageId, updateData);
+      
       toast.success('Image tags saved successfully');
-      
-      // Get next image immediately after successful save
-      const nextImageData = await getNextUntaggedImage();
-      if (nextImageData && nextImageData.length > 0) {
-        setCurrentImage(nextImageData[0]);
-        resetFormState();
-      } else {
-        setCurrentImage(null);
-        resetFormState();
-      }
-      
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to save tags';
+      await fetchNextImage(); // Get next image after successful save
+    } catch (error: any) {
+      console.error('Save error:', error);
+      const errorMessage = error.message || 'Failed to save tags';
       toast.error(errorMessage);
     } finally {
       setSaving(false);
@@ -95,7 +85,7 @@ const ImageTagging = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <TransitionWrapper className="max-w-screen-2xl mx-auto">
+      <TransitionWrapper className="max-w-screen-2xl mx-auto pb-[120px]">
         {loading ? (
           <div className="text-center py-12 mt-[72px]">Loading image...</div>
         ) : !currentImage ? (
@@ -104,9 +94,9 @@ const ImageTagging = () => {
             <Button onClick={fetchNextImage}>Refresh</Button>
           </div>
         ) : (
-          <div className="space-y-4 mt-[72px]">
-            {/* Image preview */}
-            <div className="h-[calc(100vh-280px)] flex items-center justify-center bg-secondary/30">
+          <div className="space-y-4 mt-14">
+            {/* Image preview with responsive height */}
+            <div className="h-[40vh] sm:h-[50vh] md:h-[60vh] flex items-center justify-center bg-secondary/30">
               <img
                 src={imageUrls.getPreview(currentImage.id, 'preview')}
                 alt={currentImage.filename}

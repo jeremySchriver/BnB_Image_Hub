@@ -1,6 +1,6 @@
 // API Connection Layer - Connects to FAST API instance
 
-const BASE_URL = 'http://localhost:8000';
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://192.168.0.73:8000';
 
 // =============================================================================
 // Type Definitions
@@ -111,43 +111,60 @@ export const createAPIClient = () => {
     return csrfToken;
   };
 
-  const baseRequest = async (url: string, options: RequestInit = {}, retryCount = 0) => {
-    try {
-      // Add CSRF token for mutating requests
-      if (options.method && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(options.method)) {
-        const token = await ensureCsrfToken();
-        options.headers = {
-          ...options.headers,
-          'X-CSRF-Token': token || ''
-        };
+  const getCsrfToken = async () => {
+    if (!csrfToken) {
+      try {
+        const response = await fetch(`${BASE_URL}/auth/csrf-token`, {
+          credentials: 'include'
+        });
+        const data = await response.json();
+        csrfToken = data.csrf_token;
+      } catch (error) {
+        console.error('Failed to fetch CSRF token:', error);
+        return null;
       }
+    }
+    return csrfToken;
+  };
 
-      // Only set Content-Type if not FormData
-      if (!(options.body instanceof FormData)) {
-        options.headers = {
-          'Content-Type': 'application/json',
-          ...options.headers,
-        };
-      }
-  
-      const response = await fetchWithRefresh(url, {
+  const baseRequest = async (url: string, options: RequestInit = {}) => {
+    try {
+      // Get CSRF token before making request
+      const token = await ensureCsrfToken();
+      
+      const headers = {
+        ...options.headers,
+        'X-CSRF-Token': token || '', // Add CSRF token to headers
+      };
+
+      const response = await fetch(url, {
         ...options,
         credentials: 'include',
+        headers
       });
-  
-      // Handle CSRF failures with retry
-      if (response.status === 403 && retryCount < 1) {
-        csrfToken = null; // Clear invalid token
-        return baseRequest(url, options, retryCount + 1);
-      }
-  
+
       if (!response.ok) {
-        const error = await response.json().catch(() => null);
-        throw new Error(error?.detail || `HTTP error! status: ${response.status}`);
+        // Handle non-JSON responses
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await response.json();
+          throw {
+            status: response.status,
+            message: errorData.detail || 'Unknown error occurred',
+            data: errorData
+          };
+        } else {
+          const errorText = await response.text();
+          throw {
+            status: response.status,
+            message: errorText || 'Unknown error occurred'
+          };
+        }
       }
-  
+
       return response;
     } catch (error) {
+      console.error('API Error Details:', error);
       throw error;
     }
   };
@@ -159,17 +176,33 @@ export const createAPIClient = () => {
     },
 
     post: async <T>(url: string, data?: any) => {
+      const headers: Record<string, string> = {};
+      let body: string | FormData;
+    
+      if (data instanceof FormData) {
+        body = data;
+        // Don't set Content-Type for FormData, let browser handle it
+      } else {
+        body = JSON.stringify(data);
+        headers['Content-Type'] = 'application/json';
+      }
+    
       const response = await baseRequest(url, {
         method: 'POST',
-        body: data instanceof FormData ? data : JSON.stringify(data),
-        headers: data instanceof FormData ? {} : { 'Content-Type': 'application/json' }
+        headers,
+        body
       });
       return response.json() as Promise<T>;
     },
 
     put: async <T>(url: string, data: any) => {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+
       const response = await baseRequest(url, {
         method: 'PUT',
+        headers,
         body: JSON.stringify(data)
       });
       return response.json() as Promise<T>;
@@ -466,9 +499,18 @@ export const updateImageTags = async (
   imageId: number,
   updateData: UpdateImageTagsData
 ): Promise<ImageMetadata> => {
+  // Ensure tags is an array of strings
+  const payload = {
+    tags: updateData.tags.map(tag => tag.toString().trim()),
+    author: updateData.author || null,
+    filename: updateData.filename
+  };
+
+  console.log('Sending payload:', JSON.stringify(payload));
+  
   return apiClient.put<ImageMetadata>(
     `${BASE_URL}/images/tags/${imageId}`,
-    updateData
+    payload
   );
 };
 

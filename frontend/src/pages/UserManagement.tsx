@@ -126,74 +126,77 @@ const UserManagement = () => {
           </Button>
         </div>
         <div className="bg-card border border-border rounded-xl p-4 sm:p-6 select-none">
-          <div className="overflow-x-auto pointer-events-none">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Username</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Joined</TableHead>
-                  <TableHead>Last Login</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell>{user.username}</TableCell>
-                    <TableCell>{user.email}</TableCell>
-                    <TableCell>
-                      {new Date(user.date_joined).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>
-                      {user.last_login 
-                        ? new Date(user.last_login).toLocaleDateString()
-                        : 'Never'}
-                    </TableCell>
-                    <TableCell>
-                      {user.is_superuser 
-                        ? 'Superuser' 
-                        : user.is_admin 
-                        ? 'Admin' 
-                        : 'User'}
-                    </TableCell>
-                    <TableCell>
-                      <div className="pointer-events-auto flex items-center gap-2">
-                        {!user.is_superuser && (
-                            <>
-                                <Button
-                                    variant={user.is_admin ? "destructive" : "default"}
-                                    size="sm"
-                                    onClick={() => toggleAdminStatus(user.email, user.is_admin)}
-                                    >
-                                    {user.is_admin ? (
-                                    <>
-                                        <ShieldOff className="h-4 w-4 mr-2" />
-                                        Remove Admin
-                                    </>
-                                    ) : (
-                                    <>
-                                        <Shield className="h-4 w-4 mr-2" />
-                                        Make Admin
-                                    </>
-                                    )}
-                                </Button>
-                                <Button
-                                    variant="destructive"
-                                    size="sm"
-                                    onClick={() => handleDeleteClick(user.email)}
-                                    >
-                                    <Trash2 className="h-4 w-4" />
-                                </Button>
-                            </>
-                        )}
-                      </div>
-                    </TableCell>
+          {/* Remove pointer-events-none and add proper overflow handling */}
+          <div className="overflow-x-auto max-w-[calc(100vw-2rem)]">
+            <div className="min-w-[800px]"> {/* Add minimum width to force scrolling */}
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Username</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Joined</TableHead>
+                    <TableHead>Last Login</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead className="w-[200px]">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {users.map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell>{user.username}</TableCell>
+                      <TableCell>{user.email}</TableCell>
+                      <TableCell>
+                        {new Date(user.date_joined).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>
+                        {user.last_login 
+                          ? new Date(user.last_login).toLocaleDateString()
+                          : 'Never'}
+                      </TableCell>
+                      <TableCell>
+                        {user.is_superuser 
+                          ? 'Superuser' 
+                          : user.is_admin 
+                          ? 'Admin' 
+                          : 'User'}
+                      </TableCell>
+                      <TableCell>
+                        <div className="pointer-events-auto flex items-center gap-2">
+                          {!user.is_superuser && (
+                              <>
+                                  <Button
+                                      variant={user.is_admin ? "destructive" : "default"}
+                                      size="sm"
+                                      onClick={() => toggleAdminStatus(user.email, user.is_admin)}
+                                      >
+                                      {user.is_admin ? (
+                                      <>
+                                          <ShieldOff className="h-4 w-4 mr-2" />
+                                          Remove Admin
+                                      </>
+                                      ) : (
+                                      <>
+                                          <Shield className="h-4 w-4 mr-2" />
+                                          Make Admin
+                                      </>
+                                      )}
+                                  </Button>
+                                  <Button
+                                      variant="destructive"
+                                      size="sm"
+                                      onClick={() => handleDeleteClick(user.email)}
+                                      >
+                                      <Trash2 className="h-4 w-4" />
+                                  </Button>
+                              </>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </div>
         </div>
       </TransitionWrapper>
