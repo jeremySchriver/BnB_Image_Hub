@@ -27,6 +27,15 @@ class Settings(BaseSettings):
     # Database settings
     DATABASE_URL: str = f"sqlite:///{BASE_DIR}/backend/database/tagger_db.db"
     
+    # B2 Storage settings
+    B2_APPLICATION_KEY_ID: str
+    B2_APPLICATION_KEY: str
+    B2_BUCKET_NAME: str
+    B2_DOWNLOAD_URL: str
+    
+    # Storage type
+    STORAGE_TYPE: str = "b2"  # Options: "local" or "b2"
+    
     # Directory settings
     BASE_DIR: str = BASE_DIR
     FILE_SHARE_DIR: str = FILE_SHARE_DIR

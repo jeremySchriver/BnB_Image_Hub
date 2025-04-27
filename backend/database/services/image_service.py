@@ -15,14 +15,24 @@ import shutil
 import time
 import random
 import string
+import io
 from datetime import datetime
 from pathlib import Path
 import logging
 from PIL import Image as PILImage
 import mimetypes
+from backend.utils.storage_interface import get_storage_provider
+from backend.database.services import preview_service
 
 logger = logging.getLogger(__name__)
 
+storage = get_storage_provider()
+
+def resize_image(img: PILImage.Image, max_size: int) -> PILImage.Image:
+    """Resize image maintaining aspect ratio"""
+    ratio = min(max_size/float(img.size[0]), max_size/float(img.size[1]))
+    new_size = tuple(int(dim * ratio) for dim in img.size)
+    return img.resize(new_size, PILImage.LANCZOS)
 
 '''Tag methods'''
 def _convert_tags_to_string(tags: List[str]) -> str:
@@ -59,11 +69,8 @@ def _generate_hash_filename(original_filename: str) -> str:
     # Reset the random seed to avoid affecting other random operations
     random.seed()
     
-    # Get original file extension
-    extension = Path(original_filename).suffix
-    
-    # Combine timestamp and random chars
-    return f"{timestamp}-{random_chars}{extension}"
+    # Combine timestamp and random chars without extension
+    return f"{timestamp}-{random_chars}"
 
 def update_image_metadata(
     db: Session, 
@@ -128,13 +135,12 @@ def update_image_tags(
 ) -> Optional[Image]:
     """Update image tags and move the image to tagged storage."""
     try:
-        # Get image record
         image = get_image(db, image_id)
         if not image:
             return None
 
-        # 1. Process tags
-        image.tags = []  # Clear existing tags
+        # Process tags and author updates
+        image.tags = []
         for tag_name in tags:
             tag_name = tag_name.strip().lower()
             existing_tag = get_tag_by_partial_name(db, tag_name, limit=1)
@@ -144,7 +150,6 @@ def update_image_tags(
                 tag = create_tag(db, TagCreate(name=tag_name))
             image.tags.append(tag)
         
-        # 2. Update author if provided
         if author is not None:
             existing_author = get_author_by_name(db, author.strip())
             if existing_author:
@@ -156,45 +161,142 @@ def update_image_tags(
                 ))
                 image.author_id = new_author.id
 
-        # Early commit to save tag and author changes
-        db.commit()
-
-        # 3. Handle file operations only if untagged path exists
-        if image.untagged_full_path and os.path.exists(image.untagged_full_path):
+        # Move image to tagged folder if it's in untagged
+        if image.untagged_full_path:
             try:
-                # Generate new hashed filename
-                original_filename = os.path.basename(image.untagged_full_path)
-                hashed_filename = _generate_hash_filename(original_filename)
-                image.filename = hashed_filename
+                # Download the original file
+                file_data = storage.download_file(image.untagged_full_path)
+                if file_data:
+                    # Upload to tagged folder
+                    tagged_path = f"tagged/{image.filename}"
+                    tagged_url = storage.upload_file(
+                        io.BytesIO(file_data),
+                        tagged_path,
+                        "image/jpeg"  # Adjust content type as needed
+                    )
+                    
+                    # Update paths and delete old file
+                    storage.delete_file(image.untagged_full_path)
+                    image.tagged_full_path = tagged_url
+                    image.untagged_full_path = None
 
-                # Set up new file paths
-                tagged_path = os.path.join(TAGGED_DIR, hashed_filename)
+            except Exception as e:
+                logger.error(f"Error moving file to tagged storage: {str(e)}")
 
-                # Generate preview images
-                if generate_previews(image.untagged_full_path):
-                    print(f"Generated previews for {hashed_filename}")
-                else:
-                    print(f"Failed to generate previews for {hashed_filename}")
-
-                # Move original image to tagged folder
-                shutil.move(image.untagged_full_path, tagged_path)
-                image.tagged_full_path = tagged_path
-                image.untagged_full_path = None
-
-                # Commit file changes
-                db.commit()
-                db.refresh(image)
-
-            except Exception as file_error:
-                print(f"File operation error: {str(file_error)}")
-                # Don't raise the error - we've already saved the tags and author
-
+        db.commit()
+        db.refresh(image)
         return image
 
     except Exception as e:
         db.rollback()
-        print(f"Database operation error: {str(e)}")
+        logger.error(f"Error updating image tags: {str(e)}")
         raise e
+    
+async def save_image(db: Session, file: UploadFile, author: Optional[str] = None):
+    """Save uploaded image and generate previews in B2 storage"""
+    try:
+        # Generate unique filename
+        file_extension = os.path.splitext(file.filename)[1].lower()
+        hashed_filename = _generate_hash_filename(file.filename)
+        full_filename = f"{hashed_filename}{file_extension}"
+        base_filename = hashed_filename  # Store base filename without extension
+
+        # Read file content
+        file_content = await file.read()
+        if not file_content:
+            logger.error("Received empty file")
+            raise ValueError("Empty file uploaded")
+
+        # Create file objects for uploads
+        original_file = io.BytesIO(file_content)
+        preview_file = io.BytesIO(file_content)
+
+        try:
+            # Upload original file to untagged folder
+            untagged_path = f"untagged/{full_filename}"
+            original_file.seek(0)
+            untagged_url = storage.upload_file(
+                original_file,
+                untagged_path,
+                file.content_type or 'image/jpeg'
+            )
+            logger.info(f"Original file uploaded to: {untagged_url}")
+
+            # Generate and upload previews
+            img = PILImage.open(preview_file)
+
+            # Convert RGBA/P images to RGB with white background
+            if img.mode in ('RGBA', 'P'):
+                background = PILImage.new('RGB', img.size, 'white')
+                if img.mode == 'RGBA':
+                    background.paste(img, mask=img.split()[3])
+                else:
+                    background.paste(img)
+                img = background
+
+            # Generate tag preview (800px)
+            tag_preview = resize_image(img, max_size=800)
+            tag_preview_buffer = io.BytesIO()
+            tag_preview.save(tag_preview_buffer, format='JPEG', quality=85, optimize=True)
+            tag_preview_buffer.seek(0)
+            
+            tag_preview_path = f"tag_preview/{base_filename}.jpg"
+            tag_preview_url = storage.upload_file(
+                tag_preview_buffer,
+                tag_preview_path,
+                "image/jpeg"
+            )
+            logger.info(f"Tag preview uploaded to: {tag_preview_url}")
+
+            # Generate search preview (300px)
+            search_preview = resize_image(img, max_size=300)
+            search_preview_buffer = io.BytesIO()
+            search_preview.save(search_preview_buffer, format='JPEG', quality=85, optimize=True)
+            search_preview_buffer.seek(0)
+            
+            search_preview_path = f"search_preview/{base_filename}.jpg"
+            search_preview_url = storage.upload_file(
+                search_preview_buffer,
+                search_preview_path,
+                "image/jpeg"
+            )
+            logger.info(f"Search preview uploaded to: {search_preview_url}")
+
+            # Create database record with all URLs
+            image = Image(
+                filename=full_filename,
+                untagged_full_path=untagged_url,
+                search_preview_path=search_preview_url,
+                tag_preview_path=tag_preview_url,
+                date_added=datetime.now()
+            )
+
+            if author:
+                existing_author = get_author_by_name(db, author.strip())
+                if existing_author:
+                    image.author_id = existing_author.id
+                else:
+                    new_author = create_author(db, AuthorCreate(
+                        name=author.strip(),
+                        email=f"{author.strip().replace(' ', '_')}@placeholder.com"
+                    ))
+                    image.author_id = new_author.id
+
+            db.add(image)
+            db.commit()
+            db.refresh(image)
+            
+            logger.info(f"Successfully saved image and generated previews for {full_filename}")
+            return image
+
+        except Exception as e:
+            logger.error(f"Failed to upload files to B2: {str(e)}")
+            raise
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error saving image: {str(e)}")
+        raise
 
 '''File path update methods'''
 def update_image_paths(
@@ -258,17 +360,7 @@ def create_image(db: Session, image_data: ImageCreate):
         logger.error(f"Error creating image record: {str(e)}")
         raise
 
-def save_image(db: Session, file: UploadFile, author: Optional[str] = None):
-    image = Image(
-        filename=file.filename,
-        untagged_full_path=f"images/full/{file.filename}",
-        untagged_thumb_path=f"images/thumbs/{file.filename}",
-        author=author
-    )
-    db.add(image)
-    db.commit()
-    db.refresh(image)
-    return image
+
 
 '''Get image information from the database'''
 def get_image(db: Session, image_id: int):
@@ -366,3 +458,14 @@ def delete_image(db: Session, image_id: int) -> None:
     if image:
         db.delete(image)
         db.commit()
+        
+def get_image_file(image_id: int, db: Session) -> Optional[bytes]:
+    """Get image file content from storage"""
+    image = get_image(db, image_id)
+    if not image:
+        return None
+    return storage.download_file(image.untagged_full_path)
+
+def get_image(db: Session, image_id: int) -> Optional[Image]:
+    """Get image by ID from database"""
+    return db.query(Image).filter(Image.id == image_id).first()

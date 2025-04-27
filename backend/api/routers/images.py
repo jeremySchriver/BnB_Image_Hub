@@ -1,5 +1,5 @@
-from fastapi import APIRouter, HTTPException, Depends, Query, File, UploadFile, status, Request
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, HTTPException, Depends, Query, File, UploadFile, status, Request, Response
+from fastapi.responses import FileResponse, RedirectResponse
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
@@ -25,6 +25,11 @@ from backend.api.routers.auth import get_current_user
 from backend.utils.logging_config import setup_logging
 from backend.utils.error_codes import ErrorCode
 from backend.utils.error_handling import handle_error, AppError
+from backend.utils.storage_interface import get_storage_provider
+from backend.utils.b2_storage import B2Storage
+from backend.database.services.image_service import get_image, save_image
+from backend.database.services.preview_service import resize_image
+from backend.database.services.preview_service import generate_preview
 
 # Initialize router
 router = APIRouter(
@@ -35,6 +40,8 @@ router = APIRouter(
 # Set up logger for this module
 logger = setup_logging("images")
 
+storage = get_storage_provider()
+
 # Create a limiter instance
 limiter = Limiter(key_func=get_remote_address)
 
@@ -44,44 +51,21 @@ limiter = Limiter(key_func=get_remote_address)
 
 '''Get image content from the database, including actual image file.'''
 @router.get("/content/{image_id}")
-async def get_image_content(
-    image_id: int,
-    db: Session = Depends(get_db)
-):
-    """
-    Serve the actual image file content.
+async def get_image_content(image_id: int, db: Session = Depends(get_db)):
+    image = get_image(db, image_id)
+    if not image:
+        raise HTTPException(status_code=404, detail="Image not found")
     
-    Args:
-        image_id (int): ID of the image to retrieve
-        db (Session): Database session
-        
-    Returns:
-        FileResponse: The image file
-        
-    Raises:
-        HTTPException: 404 if image not found, 500 for server errors
-    """
-    try:
-        image = get_image(db, image_id)
-        if not image:
-            raise HTTPException(status_code=404, detail="Image not found")
-            
-        file_path = image.untagged_full_path or image.tagged_full_path
-        if not file_path or not os.path.exists(file_path):
-            raise HTTPException(status_code=404, detail="Image file not found")
-            
-        return FileResponse(
-            file_path,
-            media_type=f"image/{os.path.splitext(image.filename)[1][1:]}"
-        )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to get image content: {str(e)}"
-        )
+    # For B2 storage, we can redirect to the public URL
+    if isinstance(storage, B2Storage):
+        return RedirectResponse(url=image.untagged_full_path)
+    
+    # Fallback to direct file serving for local storage
+    file_data = storage.download_file(image.untagged_full_path)
+    if not file_data:
+        raise HTTPException(status_code=404, detail="Image file not found")
+    
+    return Response(content=file_data, media_type="image/jpeg")
 
 #############################################
 # Image Tagging Endpoints
@@ -488,39 +472,11 @@ async def upload_batch_images(
         
         for file in files:
             try:
-                # Generate unique filename (without extension)
-                original_filename = os.path.splitext(file.filename)[0]
-                hashed_filename = _generate_hash_filename(original_filename)
+                # Save image to storage and create DB record
+                new_image = await save_image(db, file)
                 
-                # Get original extension
-                file_extension = os.path.splitext(file.filename)[1].lower()
-                
-                # Set up paths
-                untagged_path = os.path.join(UNTAGGED_DIR, f"{hashed_filename}{file_extension}")
-                
-                # Ensure directory exists
-                os.makedirs(os.path.dirname(untagged_path), exist_ok=True)
-                
-                # Save file to untagged directory
-                with open(untagged_path, "wb") as buffer:
-                    shutil.copyfileobj(file.file, buffer)
-                
-                # Create database record
-                image_data = ImageCreate(
-                    filename=hashed_filename,
-                    untagged_full_path=untagged_path,
-                    tag_preview_path=os.path.join(TAG_PREVIEW_DIR, f"{hashed_filename}.jpg"),
-                    search_preview_path=os.path.join(SEARCH_PREVIEW_DIR, f"{hashed_filename}.jpg")
-                )
-                
-                # Create image record first
-                new_image = create_image(db, image_data)
-                
-                # Generate preview images after DB record exists
-                if generate_previews(untagged_path, hashed_filename):
-                    logger.info(f"Generated previews for {hashed_filename}")
-                else:
-                    logger.error(f"Failed to generate previews for {hashed_filename}")
+                if not new_image:
+                    logger.error(f"Failed to save image {file.filename}")
                     results["failed"].append(file.filename)
                     
             except Exception as e:
