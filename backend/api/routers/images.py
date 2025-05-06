@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends, Query, File, UploadFile, status, Request, Response
-from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse, JSONResponse
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
@@ -20,7 +20,7 @@ from backend.database.services.image_service import (
     update_image_tags, update_image_metadata, _generate_hash_filename,
     create_image, delete_image
 )
-from backend.config import TAG_PREVIEW_DIR, SEARCH_PREVIEW_DIR, UNTAGGED_DIR
+from backend.config import TAG_PREVIEW_DIR, SEARCH_PREVIEW_DIR, UNTAGGED_DIR, Settings
 from backend.processor.thumbnail_generator import generate_previews
 from backend.api.routers.auth import get_current_user
 from backend.utils.logging_config import setup_logging
@@ -31,6 +31,7 @@ from backend.utils.b2_storage import B2Storage
 from backend.database.services.image_service import get_image, save_image
 from backend.database.services.preview_service import resize_image
 from backend.database.services.preview_service import generate_preview
+
 
 # Initialize router
 router = APIRouter(
@@ -545,14 +546,14 @@ async def upload_batch_images(
             status_code=500,
             detail=f"Upload failed: {str(e)}"
         )
-        
+
 @router.delete("/images/{image_id}")
-@limiter.limit("20/minute")  # Limit to 20 requests per minute
+@limiter.limit("20/minute")
 async def delete_image_endpoint(
     request: Request,
     image_id: int, 
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)  # Add this line
+    current_user: User = Depends(get_current_user)
 ):
     """Delete an image and all its associated files."""
     # Check if user is admin
@@ -562,6 +563,7 @@ async def delete_image_endpoint(
             error_code=ErrorCode.INSUFFICIENT_PERMISSIONS,
             status_code=status.HTTP_403_FORBIDDEN
         )
+
     image = get_image(db, image_id)
     if not image:
         raise AppError(
@@ -570,35 +572,52 @@ async def delete_image_endpoint(
             status_code=status.HTTP_404_NOT_FOUND
         )
 
-    # List of paths to delete
-    paths_to_delete = [
+    # Initialize B2 storage
+    settings = Settings()  # This will read from .env automatically
+    b2_storage = B2Storage()  # Use the default initialization
+
+    # List of file paths to delete from B2
+    b2_paths = [
         image.untagged_full_path,
         image.tag_preview_path,
         image.search_preview_path
     ]
 
-    # Delete all image files
-    for path in paths_to_delete:
-        if path and os.path.exists(path):
-            try:
-                os.remove(path)
-            except Exception as e:
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Failed to delete file {path}: {str(e)}"
-                )
+    # Delete files from B2
+    deletion_errors = []
+    for path in b2_paths:
+        if path:
+            # Extract the file path from the full URL
+            file_path = path.split(f'/file/{settings.B2_BUCKET_NAME}/')[-1] if path else None
+            if file_path:
+                success = b2_storage.delete_file(file_path)
+                if not success:
+                    deletion_errors.append(path)
 
     # Delete database record
     try:
         delete_image(db, image_id)
-        return {"message": "Image deleted successfully"}
+        
+        if deletion_errors:
+            return JSONResponse(
+                status_code=status.HTTP_207_MULTI_STATUS,
+                content={
+                    "message": "Image record deleted but some files could not be removed from storage",
+                    "failed_deletions": deletion_errors
+                }
+            )
+            
+        return JSONResponse(
+            content={"message": "Image deleted successfully"},
+            status_code=status.HTTP_200_OK
+        )
+            
     except Exception as e:
         if isinstance(e, HTTPException) and e.status_code == 429:
-            # Rate limit exceeded
             retry_after = 60
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=f"Too many login attempts. Please try again in {retry_after} seconds.",
+                detail=f"Too many requests. Please try again in {retry_after} seconds.",
                 headers={"Retry-After": str(retry_after)}
             )
         else:
