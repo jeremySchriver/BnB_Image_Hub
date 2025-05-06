@@ -97,12 +97,7 @@ async def download_image(
             
             return Response(
                 content=file_data,
-                media_type=content_type,
-                headers={
-                    "Content-Disposition": f'attachment; filename="{image.filename}"',
-                    "Access-Control-Allow-Origin": "http://192.168.0.73:8080",
-                    "Access-Control-Allow-Credentials": "true"
-                }
+                media_type=content_type
             )
 
     except HTTPException as he:
