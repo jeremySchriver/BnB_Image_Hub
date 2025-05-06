@@ -4,7 +4,7 @@ import Button from './Button';
 import TagInput from './TagInput';
 import AuthorInput from './AuthorInput';
 import { formatFileSize } from '@/lib/utils';
-import { updateImageMetadata, updateImageTags, imageUrls } from '@/utils/api';
+import { updateImageMetadata, updateImageTags, imageUrls, downloadImage } from '@/utils/api';
 import type { ImageMetadata } from '@/utils/api';
 import { toast } from 'sonner';
 

@@ -462,6 +462,21 @@ export const imageUrls = {
     `${BASE_URL}/images/content/${imageId}`
 };
 
+export const downloadImage = async (imageId: string): Promise<Blob> => {
+  const response = await fetch(`${BASE_URL}/images/download/${imageId}`, {
+      credentials: 'include',
+      headers: {
+          'Accept': 'image/jpeg,image/png,image/webp,*/*'
+      }
+  });
+  
+  if (!response.ok) {
+      throw new Error(`Failed to download image: ${response.statusText}`);
+  }
+  
+  return response.blob();
+};
+
 // Create a method to fetch preview metadata if needed
 export const fetchPreviewMetadata = async (imageId: string | number): Promise<ImageMetadata> => {
   return apiClient.get<ImageMetadata>(`${BASE_URL}/images/preview/metadata/${imageId}`);

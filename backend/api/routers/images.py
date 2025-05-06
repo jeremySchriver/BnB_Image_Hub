@@ -1,11 +1,12 @@
 from fastapi import APIRouter, HTTPException, Depends, Query, File, UploadFile, status, Request, Response
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import os
 import shutil
+import httpx
 
 from backend.database.database import get_db
 from backend.database.models.image import Image
@@ -66,6 +67,51 @@ async def get_image_content(image_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Image file not found")
     
     return Response(content=file_data, media_type="image/jpeg")
+
+@router.get("/download/{image_id}")
+async def download_image(
+    image_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        # Get image metadata from database
+        image = get_image(db, image_id)
+        if not image:
+            raise HTTPException(status_code=404, detail="Image not found")
+
+        # For B2 storage, redirect to signed URL
+        if isinstance(storage, B2Storage):
+            # Get the file data using the storage provider
+            file_data = storage.download_file(image.untagged_full_path or image.tagged_full_path)
+            if not file_data:
+                raise HTTPException(status_code=404, detail="Image file not found")
+            
+            # Determine content type based on file extension
+            content_type = "image/jpeg"  # default
+            if image.filename.lower().endswith('.png'):
+                content_type = "image/png"
+            elif image.filename.lower().endswith('.webp'):
+                content_type = "image/webp"
+            
+            return Response(
+                content=file_data,
+                media_type=content_type,
+                headers={
+                    "Content-Disposition": f'attachment; filename="{image.filename}"',
+                    "Access-Control-Allow-Origin": "http://192.168.0.73:8080",
+                    "Access-Control-Allow-Credentials": "true"
+                }
+            )
+
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        logger.error(f"Error downloading image: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
 
 #############################################
 # Image Tagging Endpoints
