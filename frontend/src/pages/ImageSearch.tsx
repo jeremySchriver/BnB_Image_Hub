@@ -92,7 +92,6 @@ const ImageSearch = () => {
       };
       
       const results = await searchImages(filters);
-      console.log('Search results:', results);
       setImages(results);
     } catch (error) {
       if (hasInitialized) {
