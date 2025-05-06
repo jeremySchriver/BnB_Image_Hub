@@ -92,6 +92,7 @@ const ImageSearch = () => {
       };
       
       const results = await searchImages(filters);
+      console.log('Search results:', results);
       setImages(results);
     } catch (error) {
       if (hasInitialized) {
@@ -233,7 +234,7 @@ const ImageSearch = () => {
               {images.map((image) => (
                 <ImageCard
                   key={image.id}
-                  src={imageUrls.getPreview(image.id, 'search')}
+                  src={image.search_preview_path} // Use the search_preview_path directly
                   alt={`Image ${image.id}`}
                   tags={image.tags}
                   author={image.author}

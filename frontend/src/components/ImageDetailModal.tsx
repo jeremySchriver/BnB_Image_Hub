@@ -112,11 +112,11 @@ const ImageDetailModal: React.FC<ImageDetailModalProps> = ({
             {/* Body */}
             <div className={styles.body}>
               {/* Image Preview */}
-              <div className={styles.imageSection}>
+              <div className="relative aspect-square md:aspect-auto md:h-[60vh] bg-secondary/30 rounded-lg overflow-hidden">
                 <img
-                  src={imageUrls.getPreview(image.id, 'preview')}
-                  alt={`Image ${image.id}`}
-                  className={styles.image}
+                  src={image.tag_preview_path} // Use the tag_preview_path for the detail view
+                  alt={image.filename}
+                  className="w-full h-full object-contain"
                 />
               </div>
 

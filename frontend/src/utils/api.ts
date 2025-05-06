@@ -27,9 +27,9 @@ export interface ImageMetadata {
   id: string;
   filename: string;
   tagged_full_path: string;
-  tagged_thumb_path: string;
   untagged_full_path: string;
-  untagged_thumb_path: string;
+  search_preview_path: string | null;
+  tag_preview_path: string | null;
   tags: string[];
   date_added: string;
   author: string;

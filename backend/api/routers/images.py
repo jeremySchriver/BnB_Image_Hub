@@ -370,6 +370,8 @@ def search_images(
                 "filename": image.filename,
                 "tagged_full_path": image.tagged_full_path,
                 "untagged_full_path": image.untagged_full_path,
+                "search_preview_path": image.search_preview_path,
+                "tag_preview_path": image.tag_preview_path,
                 "tags": [tag.name for tag in image.tags],
                 "date_added": image.date_added.isoformat() if image.date_added else None,
                 "author": image.author.name if image.author else None,

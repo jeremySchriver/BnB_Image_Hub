@@ -46,7 +46,7 @@ class B2Storage:
             )
             
             # Construct and return the full URL
-            url = f"{self.base_url}/file/{self.bucket.name}/{file_name}"
+            url = f"{self.base_url}/{file_name}"
             print(f"Successfully uploaded to B2: {url}")  # Debug print
             return url
             

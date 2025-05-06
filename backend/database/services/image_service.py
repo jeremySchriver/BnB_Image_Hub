@@ -167,7 +167,7 @@ def update_image_tags(
                 # Download the original file
                 file_data = storage.download_file(image.untagged_full_path)
                 if file_data:
-                    # Upload to tagged folder
+                    # Upload to tagged folder with original filename
                     tagged_path = f"tagged/{image.filename}"
                     tagged_url = storage.upload_file(
                         io.BytesIO(file_data),
@@ -179,9 +179,10 @@ def update_image_tags(
                     storage.delete_file(image.untagged_full_path)
                     image.tagged_full_path = tagged_url
                     image.untagged_full_path = None
-
-            except Exception as e:
-                logger.error(f"Error moving file to tagged storage: {str(e)}")
+            except Exception as storage_error:
+                logger.error(f"Error moving image to tagged storage: {str(storage_error)}")
+                # Continue with tag updates even if storage operations fail
+                # The file can be moved later if needed
 
         db.commit()
         db.refresh(image)
@@ -199,7 +200,6 @@ async def save_image(db: Session, file: UploadFile, author: Optional[str] = None
         file_extension = os.path.splitext(file.filename)[1].lower()
         hashed_filename = _generate_hash_filename(file.filename)
         full_filename = f"{hashed_filename}{file_extension}"
-        base_filename = hashed_filename  # Store base filename without extension
 
         # Read file content
         file_content = await file.read()
@@ -220,7 +220,6 @@ async def save_image(db: Session, file: UploadFile, author: Optional[str] = None
                 untagged_path,
                 file.content_type or 'image/jpeg'
             )
-            logger.info(f"Original file uploaded to: {untagged_url}")
 
             # Generate and upload previews
             img = PILImage.open(preview_file)
@@ -240,13 +239,12 @@ async def save_image(db: Session, file: UploadFile, author: Optional[str] = None
             tag_preview.save(tag_preview_buffer, format='JPEG', quality=85, optimize=True)
             tag_preview_buffer.seek(0)
             
-            tag_preview_path = f"tag_preview/{base_filename}.jpg"
+            tag_preview_path = f"tag_preview/{hashed_filename}.jpg"
             tag_preview_url = storage.upload_file(
                 tag_preview_buffer,
                 tag_preview_path,
                 "image/jpeg"
             )
-            logger.info(f"Tag preview uploaded to: {tag_preview_url}")
 
             # Generate search preview (300px)
             search_preview = resize_image(img, max_size=300)
@@ -254,21 +252,29 @@ async def save_image(db: Session, file: UploadFile, author: Optional[str] = None
             search_preview.save(search_preview_buffer, format='JPEG', quality=85, optimize=True)
             search_preview_buffer.seek(0)
             
-            search_preview_path = f"search_preview/{base_filename}.jpg"
+            search_preview_path = f"search_preview/{hashed_filename}.jpg"
             search_preview_url = storage.upload_file(
                 search_preview_buffer,
                 search_preview_path,
                 "image/jpeg"
             )
-            logger.info(f"Search preview uploaded to: {search_preview_url}")
 
-            # Create database record with all URLs
+            # Get image details
+            img_details = {
+                "file_size": len(file_content),
+                "file_type": file.content_type,
+                "width": img.width,
+                "height": img.height
+            }
+
+            # Create database record with B2 URLs
             image = Image(
                 filename=full_filename,
                 untagged_full_path=untagged_url,
                 search_preview_path=search_preview_url,
                 tag_preview_path=tag_preview_url,
-                date_added=datetime.now()
+                date_added=datetime.now(),
+                **img_details
             )
 
             if author:
@@ -303,14 +309,18 @@ def update_image_paths(
     db: Session, 
     image_id: int, 
     tagged_full_path: Optional[str] = None,
-    tagged_thumb_path: Optional[str] = None
+    search_preview_path: Optional[str] = None,
+    tag_preview_path: Optional[str] = None
 ):
+    """Update image paths with B2 URLs"""
     image = get_image(db, image_id)
     if image:
         if tagged_full_path:
             image.tagged_full_path = tagged_full_path
-        if tagged_thumb_path:
-            image.tagged_thumb_path = tagged_thumb_path
+        if search_preview_path:
+            image.search_preview_path = search_preview_path
+        if tag_preview_path:
+            image.tag_preview_path = tag_preview_path
         db.commit()
         db.refresh(image)
     return image

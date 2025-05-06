@@ -98,7 +98,7 @@ const ImageTagging = () => {
             {/* Image preview with responsive height */}
             <div className="h-[40vh] sm:h-[50vh] md:h-[60vh] flex items-center justify-center bg-secondary/30">
               <img
-                src={imageUrls.getPreview(currentImage.id, 'preview')}
+                src={currentImage.tag_preview_path} // Use the tag_preview_path directly
                 alt={currentImage.filename}
                 className="max-h-full max-w-full object-contain rounded-lg"
                 loading="lazy"
